@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LeadsProvider, useLeads } from '@/contexts/LeadsContext';
+import { AgentProvider } from '@/contexts/AgentContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DashboardView } from '@/components/views/DashboardView';
@@ -7,6 +8,7 @@ import { LeadsView } from '@/components/views/LeadsView';
 import { ConversationsView } from '@/components/views/ConversationsView';
 import { ScheduleView } from '@/components/schedule/ScheduleView';
 import { ExportPanel } from '@/components/export/ExportPanel';
+import { AgentConfigView } from '@/components/views/AgentConfigView';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Settings, Bell, Shield, Palette } from 'lucide-react';
 
@@ -108,6 +110,7 @@ function AppContent() {
       case 'conversations': return 'Conversas';
       case 'schedule': return 'Agendamentos';
       case 'export': return 'Exportar Dados';
+      case 'agent': return 'Configuração do Agente';
       case 'settings': return 'Configurações';
       default: return 'SDR Jurídico';
     }
@@ -137,6 +140,7 @@ function AppContent() {
           {currentView === 'conversations' && <ConversationsView />}
           {currentView === 'schedule' && <ScheduleView />}
           {currentView === 'export' && <ExportPanel />}
+          {currentView === 'agent' && <AgentConfigView />}
           {currentView === 'settings' && <SettingsView />}
         </div>
       </main>
@@ -147,7 +151,9 @@ function AppContent() {
 const Index = () => {
   return (
     <LeadsProvider>
-      <AppContent />
+      <AgentProvider>
+        <AppContent />
+      </AgentProvider>
     </LeadsProvider>
   );
 };

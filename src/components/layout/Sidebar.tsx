@@ -9,7 +9,8 @@ import {
   Settings,
   Scale,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Bot
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ const navItems = [
   { id: 'conversations', label: 'Conversas', icon: MessageSquare },
   { id: 'schedule', label: 'Agendamentos', icon: Calendar },
   { id: 'export', label: 'Exportar Dados', icon: Download },
+  { id: 'agent', label: 'Agente IA', icon: Bot },
 ];
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
