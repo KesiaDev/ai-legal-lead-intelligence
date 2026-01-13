@@ -1,5 +1,7 @@
 // Agent configuration types
 
+import { AIConfig } from './ai';
+
 export interface AgentConfig {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export interface AgentConfig {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  aiConfig: AIConfig;
 }
 
 export interface BusinessHours {

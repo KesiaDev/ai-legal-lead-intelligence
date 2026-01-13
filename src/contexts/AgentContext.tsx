@@ -47,6 +47,10 @@ const defaultAgent: AgentConfig = {
   isActive: true,
   createdAt: new Date(),
   updatedAt: new Date(),
+  aiConfig: {
+    enabled: true,
+    interventionLevel: 'medio',
+  },
 };
 
 const defaultCommunication: CommunicationConfig = {
