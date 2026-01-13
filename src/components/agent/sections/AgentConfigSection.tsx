@@ -1,11 +1,12 @@
 import { useAgent } from '@/contexts/AgentContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Power, PowerOff } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Power, PowerOff, Sparkles, Brain, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function AgentConfigSection() {
@@ -51,6 +52,111 @@ export function AgentConfigSection() {
               <PowerOff className="w-4 h-4" />
               DESLIGAR
             </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuração de IA */}
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            <CardTitle className="text-lg">Inteligência Artificial</CardTitle>
+          </div>
+          <CardDescription>
+            Configure o comportamento da IA controlada para qualificação de leads
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Toggle IA */}
+          <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                agent.aiConfig.enabled ? "bg-primary/20" : "bg-muted"
+              )}>
+                <Brain className={cn(
+                  "w-5 h-5",
+                  agent.aiConfig.enabled ? "text-primary" : "text-muted-foreground"
+                )} />
+              </div>
+              <div>
+                <p className="font-medium">IA Controlada</p>
+                <p className="text-sm text-muted-foreground">
+                  {agent.aiConfig.enabled 
+                    ? "IA ativa para análise e sugestões" 
+                    : "Usando apenas fluxo manual"}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={agent.aiConfig.enabled}
+              onCheckedChange={(enabled) => 
+                updateAgent({ aiConfig: { ...agent.aiConfig, enabled } })
+              }
+            />
+          </div>
+
+          {/* Nível de Intervenção */}
+          {agent.aiConfig.enabled && (
+            <div className="space-y-3">
+              <Label>Nível de Intervenção da IA</Label>
+              <Select
+                value={agent.aiConfig.interventionLevel}
+                onValueChange={(value: 'baixo' | 'medio') =>
+                  updateAgent({ aiConfig: { ...agent.aiConfig, interventionLevel: value } })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixo">
+                    <div className="flex items-center gap-2">
+                      <span>Baixo</span>
+                      <span className="text-xs text-muted-foreground">- Apenas análise passiva</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="medio">
+                    <div className="flex items-center gap-2">
+                      <span>Médio</span>
+                      <span className="text-xs text-muted-foreground">- Análise + sugestões ativas</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {agent.aiConfig.interventionLevel === 'baixo' 
+                  ? "A IA analisa as mensagens mas não interfere no fluxo."
+                  : "A IA sugere perguntas personalizadas e analisa respostas em tempo real."}
+              </p>
+            </div>
+          )}
+
+          {/* Regras de Compliance */}
+          <div className="p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="w-4 h-4 text-success" />
+              <span className="font-medium text-sm">Regras de Compliance Ativas</span>
+            </div>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                Nunca oferece consultoria jurídica
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                Nunca promete resultados
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                Mantém tom profissional e ético
+              </li>
+              <li className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                Segue apenas fluxo definido
+              </li>
+            </ul>
           </div>
         </CardContent>
       </Card>
