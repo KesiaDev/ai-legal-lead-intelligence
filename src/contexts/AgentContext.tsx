@@ -9,6 +9,8 @@ import {
   Intention,
   BusinessHours,
 } from '@/types/agent';
+import { HumanizationConfig, DEFAULT_HUMANIZATION_CONFIG } from '@/types/humanization';
+import { VoiceConfig, DEFAULT_VOICE_CONFIG } from '@/types/voice';
 
 interface AgentContextType {
   agent: AgentConfig;
@@ -28,6 +30,10 @@ interface AgentContextType {
   intentions: Intention[];
   addIntention: (intention: Intention) => void;
   updateIntention: (id: string, updates: Partial<Intention>) => void;
+  humanizationConfig: HumanizationConfig;
+  updateHumanizationConfig: (updates: Partial<HumanizationConfig>) => void;
+  voiceConfig: VoiceConfig;
+  updateVoiceConfig: (updates: Partial<VoiceConfig>) => void;
 }
 
 const defaultBusinessHours: BusinessHours[] = [
@@ -163,6 +169,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [followUpConfig, setFollowUpConfig] = useState<FollowUpConfig>(defaultFollowUp);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(defaultSchedule);
   const [intentions, setIntentions] = useState<Intention[]>(defaultIntentions);
+  const [humanizationConfig, setHumanizationConfig] = useState<HumanizationConfig>(DEFAULT_HUMANIZATION_CONFIG);
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(DEFAULT_VOICE_CONFIG);
 
   const updateAgent = (updates: Partial<AgentConfig>) => {
     setAgent(prev => ({ ...prev, ...updates, updatedAt: new Date() }));
@@ -204,6 +212,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setIntentions(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
   };
 
+  const updateHumanizationConfig = (updates: Partial<HumanizationConfig>) => {
+    setHumanizationConfig(prev => ({ ...prev, ...updates }));
+  };
+
+  const updateVoiceConfig = (updates: Partial<VoiceConfig>) => {
+    setVoiceConfig(prev => ({ ...prev, ...updates }));
+  };
+
   return (
     <AgentContext.Provider value={{
       agent,
@@ -223,6 +239,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       intentions,
       addIntention,
       updateIntention,
+      humanizationConfig,
+      updateHumanizationConfig,
+      voiceConfig,
+      updateVoiceConfig,
     }}>
       {children}
     </AgentContext.Provider>

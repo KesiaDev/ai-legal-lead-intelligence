@@ -81,6 +81,8 @@ export interface Intention {
 export type AgentSection = 
   | 'config' 
   | 'communication' 
+  | 'humanization'
+  | 'voice'
   | 'prompts' 
   | 'knowledge' 
   | 'followup' 
