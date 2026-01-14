@@ -3,6 +3,8 @@ import { AgentSection } from '@/types/agent';
 import { AgentSidebar } from '@/components/agent/AgentSidebar';
 import { AgentConfigSection } from '@/components/agent/sections/AgentConfigSection';
 import { CommunicationSection } from '@/components/agent/sections/CommunicationSection';
+import { HumanizationSection } from '@/components/agent/sections/HumanizationSection';
+import { VoiceConfigSection } from '@/components/agent/sections/VoiceConfigSection';
 import { PromptsSection } from '@/components/agent/sections/PromptsSection';
 import { KnowledgeBaseSection } from '@/components/agent/sections/KnowledgeBaseSection';
 import { FollowUpSection } from '@/components/agent/sections/FollowUpSection';
@@ -20,6 +22,10 @@ export function AgentConfigView() {
         return <AgentConfigSection />;
       case 'communication':
         return <CommunicationSection />;
+      case 'humanization':
+        return <HumanizationSection />;
+      case 'voice':
+        return <VoiceConfigSection />;
       case 'prompts':
         return <PromptsSection />;
       case 'knowledge':

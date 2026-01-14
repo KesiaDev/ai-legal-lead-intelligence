@@ -9,7 +9,9 @@ import {
   Target,
   Bot,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Mic
 } from 'lucide-react';
 import { useState } from 'react';
 import { AgentSection } from '@/types/agent';
@@ -23,7 +25,9 @@ interface AgentSidebarProps {
 const agentSections = [
   { id: 'config' as AgentSection, label: 'Configurações', icon: Settings },
   { id: 'communication' as AgentSection, label: 'Comunicação', icon: MessageCircle },
-  { id: 'prompts' as AgentSection, label: 'Prompt', icon: FileText },
+  { id: 'humanization' as AgentSection, label: 'Humanização', icon: Sparkles },
+  { id: 'voice' as AgentSection, label: 'Voz', icon: Mic },
+  { id: 'prompts' as AgentSection, label: 'Prompts', icon: FileText },
   { id: 'knowledge' as AgentSection, label: 'Base de Conhecimento', icon: BookOpen },
   { id: 'followup' as AgentSection, label: 'Follow-up', icon: RefreshCw },
   { id: 'schedule' as AgentSection, label: 'Agenda', icon: Calendar },
