@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
+import bcrypt from 'bcryptjs';
 import { env } from './config/env';
 import prisma from './config/database';
 
@@ -73,7 +74,6 @@ async function build() {
         data: { name: tenantName },
       });
 
-      const bcrypt = require('bcryptjs');
       const hashedPassword = await bcrypt.hash(password, 10);
 
       const user = await prisma.user.create({
@@ -124,7 +124,6 @@ async function build() {
         return reply.status(401).send({ error: 'Invalid credentials' });
       }
 
-      const bcrypt = require('bcryptjs');
       const valid = await bcrypt.compare(password, user.password);
 
       if (!valid) {
