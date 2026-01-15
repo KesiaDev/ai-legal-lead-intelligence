@@ -189,7 +189,8 @@ async function start() {
     console.log('✅ Database connected');
 
     const app = await build();
-    const PORT = Number(process.env.PORT) || env.PORT;
+    // Railway fornece PORT via process.env, priorizar isso
+    const PORT = Number(process.env.PORT) || Number(env.PORT) || 3001;
     
     await app.listen({
       port: PORT,
@@ -199,6 +200,7 @@ async function start() {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Environment: ${env.NODE_ENV}`);
     console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
+    console.log(`🔌 Process PORT: ${process.env.PORT || 'not set'}`);
   } catch (err: any) {
     console.error('❌ Failed to start server:', err);
     fastify.log.error(err);
