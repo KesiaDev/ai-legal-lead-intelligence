@@ -8,6 +8,6 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
-});
+}).catchall(z.any()); // Permite outras variáveis de ambiente
 
 export const env = envSchema.parse(process.env);

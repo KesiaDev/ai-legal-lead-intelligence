@@ -14,9 +14,10 @@ const fastify = Fastify({
 
 // Registrar plugins
 async function build() {
-  // CORS
+  // CORS - suporta múltiplas origens separadas por vírgula
+  const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
   await fastify.register(cors, {
-    origin: env.CORS_ORIGIN,
+    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
     credentials: true,
   });
 
@@ -56,7 +57,8 @@ async function build() {
   // Rotas de autenticação (simplificadas por enquanto)
   fastify.post('/register', async (request: any, reply: any) => {
     try {
-      const { email, name, password, tenantName } = request.body as any;
+      const body = request.body as any;
+      const { email, name, password, tenantName } = body || {};
       
       if (!email || !name || !password || !tenantName) {
         return reply.status(400).send({ error: 'Missing required fields' });
@@ -102,14 +104,18 @@ async function build() {
         },
       };
     } catch (error: any) {
-      fastify.log.error(error);
-      return reply.status(500).send({ error: 'Failed to register' });
+      fastify.log.error('Register error:', error);
+      return reply.status(500).send({ 
+        error: 'Failed to register',
+        message: error.message || 'Internal server error'
+      });
     }
   });
 
   fastify.post('/login', async (request: any, reply: any) => {
     try {
-      const { email, password } = request.body as any;
+      const body = request.body as any;
+      const { email, password } = body || {};
 
       if (!email || !password) {
         return reply.status(400).send({ error: 'Email and password required' });
@@ -146,8 +152,11 @@ async function build() {
         },
       };
     } catch (error: any) {
-      fastify.log.error(error);
-      return reply.status(500).send({ error: 'Failed to login' });
+      fastify.log.error('Login error:', error);
+      return reply.status(500).send({ 
+        error: 'Failed to login',
+        message: error.message || 'Internal server error'
+      });
     }
   });
 
