@@ -6,6 +6,7 @@ import websocket from '@fastify/websocket';
 import bcrypt from 'bcryptjs';
 import { env } from './config/env';
 import prisma from './config/database';
+import { registerIntakeRoute } from './api/agent/intake';
 
 const fastify = Fastify({
   logger: {
@@ -229,6 +230,9 @@ async function build() {
 
     return { user };
   });
+
+  // Registrar rota de intake de leads (isolada)
+  await registerIntakeRoute(fastify);
 
   return fastify;
 }
