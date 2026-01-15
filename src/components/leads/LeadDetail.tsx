@@ -57,9 +57,7 @@ export function LeadDetail({ lead, onClose }: LeadDetailProps) {
                   Área do Direito
                 </p>
                 <p className="mt-1 font-medium text-foreground">
-                  {lead.legalArea === 'outra' && lead.customLegalArea
-                    ? lead.customLegalArea
-                    : LEGAL_AREAS[lead.legalArea as LegalArea] || lead.legalArea}
+                  {LEGAL_AREAS[lead.legalArea]}
                 </p>
               </div>
             )}

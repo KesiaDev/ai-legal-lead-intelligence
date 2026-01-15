@@ -1,6 +1,9 @@
-// Importar áreas do arquivo dedicado
-import type { LegalArea } from './legalAreas';
-export type { LegalArea } from './legalAreas';
+export type LegalArea = 
+  | 'trabalhista'
+  | 'previdenciario'
+  | 'familia'
+  | 'civel'
+  | 'penal';
 
 export type LeadStatus = 
   | 'frio'
@@ -34,7 +37,6 @@ export interface Lead {
   city?: string;
   state?: string;
   legalArea?: LegalArea;
-  customLegalArea?: string; // Para especializações customizadas quando legalArea = 'outra'
   demandDescription?: string;
   urgency?: Urgency;
   status: LeadStatus;
@@ -56,8 +58,13 @@ export interface ConversationStep {
   options?: string[];
 }
 
-// Re-exportar LEGAL_AREAS do arquivo dedicado
-export { LEGAL_AREAS, getLegalAreasAsOptions, getLegalAreasGrouped } from './legalAreas';
+export const LEGAL_AREAS: Record<LegalArea, string> = {
+  trabalhista: 'Direito Trabalhista',
+  previdenciario: 'Direito Previdenciário',
+  familia: 'Direito de Família',
+  civel: 'Direito Cível',
+  penal: 'Direito Penal',
+};
 
 export const URGENCY_LABELS: Record<Urgency, string> = {
   baixa: 'Baixa',

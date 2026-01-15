@@ -20,9 +20,9 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { leads } = useLeads();
-  const { user, tenant, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const urgentCount = leads.filter((l: any) => l.status === 'urgente' || l.urgency === 'alta').length;
+  const urgentCount = leads.filter(l => l.status === 'urgente').length;
 
   const handleLogout = () => {
     logout();
@@ -79,15 +79,10 @@ export function Header({ title, subtitle }: HeaderProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user?.name}</p>
+                <p className="text-sm font-medium leading-none">{user?.name || 'Usuário'}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {user?.email}
+                  {user?.email || ''}
                 </p>
-                {tenant && (
-                  <p className="text-xs leading-none text-muted-foreground mt-1">
-                    {tenant.name}
-                  </p>
-                )}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

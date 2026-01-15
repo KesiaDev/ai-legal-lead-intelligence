@@ -1,84 +1,26 @@
-import { useState } from 'react';
-import { ChatLive } from '@/components/chat/ChatLive';
-import { ConversationsList } from '@/components/chat/ConversationsList';
+import { ChatSimulator } from '@/components/chat/ChatSimulator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Bot, Shield, Clock } from 'lucide-react';
-import { useLeads } from '@/hooks/useLeads';
-import { conversationsApi } from '@/api/conversations';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 
 export function ConversationsView() {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const { leads } = useLeads();
-
-  const handleSelectConversation = (conversationId: string) => {
-    setSelectedConversationId(conversationId);
-  };
-
-  const handleStartNewConversation = async () => {
-    // Pegar primeiro lead disponível ou criar um novo
-    const firstLead = leads[0];
-    if (!firstLead) {
-      // TODO: Mostrar modal para criar lead primeiro
-      return;
-    }
-
-    try {
-      // Verificar se já existe conversa para este lead
-      const existing = await conversationsApi.getAll({ leadId: firstLead.id });
-      if (existing.data.conversations.length > 0) {
-        setSelectedConversationId(existing.data.conversations[0].id);
-        return;
-      }
-
-      // Criar nova conversa
-      const newConversation = await conversationsApi.create({
-        leadId: firstLead.id,
-        channel: 'chat',
-        assignedType: 'ai',
-      });
-      setSelectedConversationId(newConversation.data.conversation.id);
-    } catch (error) {
-      console.error('Failed to create conversation:', error);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-display font-semibold text-foreground">
-            Chat ao Vivo
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Atendimento em tempo real com leads
-          </p>
-        </div>
-        <Button onClick={handleStartNewConversation}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Conversa
-        </Button>
+      <div>
+        <h2 className="text-2xl font-display font-semibold text-foreground">
+          Simulador de Conversa
+        </h2>
+        <p className="text-muted-foreground mt-1">
+          Teste o fluxo de atendimento automatizado do SDR Jurídico.
+        </p>
       </div>
 
-      <div className="flex gap-6 h-[600px]">
-        {/* Lista de Conversas */}
-        <ConversationsList
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={handleSelectConversation}
-        />
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Chat Simulator */}
+        <ChatSimulator />
 
-        {/* Chat Live */}
-        <div className="flex-1">
-          <ChatLive
-            conversationId={selectedConversationId}
-          />
-        </div>
-      </div>
-
-      {/* Info Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-6">
-        <Card className="card-elevated">
+        {/* Info Cards */}
+        <div className="space-y-4">
+          <Card className="card-elevated">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -157,6 +99,7 @@ export function ConversationsView() {
               </p>
             </CardContent>
           </Card>
+        </div>
       </div>
     </div>
   );
