@@ -65,7 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.data.user);
       setTenant(response.data.tenant);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao fazer login');
+      const errorMessage = err.response?.data?.message 
+        || err.message 
+        || 'Erro ao fazer login. Verifique se o backend está online.';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);
@@ -81,7 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(response.data.user);
       setTenant(response.data.tenant);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao criar conta');
+      const errorMessage = err.response?.data?.message 
+        || err.message 
+        || 'Erro ao criar conta. Verifique se o backend está online.';
+      setError(errorMessage);
       throw err;
     } finally {
       setIsLoading(false);

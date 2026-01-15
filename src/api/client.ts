@@ -22,10 +22,15 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Só redireciona para login se for erro 401 (não autorizado)
+    // Erros 500, 404, etc. devem ser tratados pelo componente
     if (error.response?.status === 401) {
       // Token expirado ou inválido
       localStorage.removeItem('auth_token');
-      window.location.href = '/login';
+      // Só redireciona se não estiver já na página de login
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }

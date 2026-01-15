@@ -30,9 +30,11 @@ export function LoginView() {
     setRegisterError(null);
     try {
       await login({ email: loginEmail, password: loginPassword });
-      navigate('/');
-    } catch (err) {
-      // Error is handled by AuthContext
+      // Redireciona para o dashboard após login bem-sucedido
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      // Error is handled by AuthContext, mas não navega em caso de erro
+      console.error('Login error:', err);
     }
   };
 
@@ -46,9 +48,12 @@ export function LoginView() {
         password: registerPassword,
         tenantName: registerTenantName,
       });
-      navigate('/');
+      // Redireciona para o dashboard após registro bem-sucedido
+      navigate('/', { replace: true });
     } catch (err: any) {
-      setRegisterError(err.response?.data?.message || 'Erro ao criar conta');
+      const errorMessage = err.response?.data?.message || err.message || 'Erro ao criar conta';
+      setRegisterError(errorMessage);
+      console.error('Register error:', err);
     }
   };
 
