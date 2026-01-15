@@ -58,6 +58,23 @@ async function build() {
     await ensureTenantAccess(request, reply);
   });
 
+  // Rota raiz
+  fastify.get('/', async () => {
+    return {
+      message: 'SDR Jurídico API',
+      version: '1.0.0',
+      status: 'online',
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        health: '/health',
+        auth: '/register, /login, /me',
+        leads: '/leads',
+        conversations: '/conversations',
+        pipeline: '/pipeline/stages',
+      },
+    };
+  });
+
   // Health check
   fastify.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
