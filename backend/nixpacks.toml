@@ -8,4 +8,4 @@ cmds = ["npm ci"]
 cmds = ["npm run db:generate"]
 
 [start]
-cmd = "node dist/server.js"
+cmd = "npm start"

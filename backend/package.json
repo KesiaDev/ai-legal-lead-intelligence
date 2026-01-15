@@ -2,11 +2,11 @@
   "name": "sdr-juridico-backend",
   "version": "1.0.0",
   "description": "Backend API para SDR Jurídico",
-  "main": "dist/server.js",
+  "main": "src/server.ts",
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "start": "tsx src/server.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx src/prisma/seed.ts",
