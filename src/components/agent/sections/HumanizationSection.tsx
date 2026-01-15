@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { 
   Select, 
   SelectContent, 
@@ -10,19 +11,46 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Sparkles, MessageSquare, Type, AlertCircle } from 'lucide-react';
+import { Sparkles, MessageSquare, Type, AlertCircle, Save, RotateCcw } from 'lucide-react';
 import { useAgent } from '@/contexts/AgentContext';
-import { previewHumanization } from '@/services/textHumanizer';
+import { humanizeText, previewHumanization } from '@/services/textHumanizer';
 import { 
   MessageLength, 
   EmojiUsage, 
   IntensityLevel 
 } from '@/types/humanization';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 export function HumanizationSection() {
   const { humanizationConfig, updateHumanizationConfig } = useAgent();
+  const [testInput, setTestInput] = useState('Olá! Obrigado por entrar em contato. Entendi que você está buscando orientação sobre um processo trabalhista. Poderia me informar há quanto tempo você foi desligado da empresa? Essa informação é importante para analisarmos seu caso.');
+  const [humanizedOutput, setHumanizedOutput] = useState('');
   
   const preview = previewHumanization(humanizationConfig);
+
+  const handleTestHumanization = () => {
+    const result = humanizeText(testInput, humanizationConfig);
+    setHumanizedOutput(result.text);
+    toast.success('Texto humanizado com sucesso!');
+  };
+
+  const handleSaveConfig = () => {
+    // In a real app, this would save to backend
+    toast.success('Configurações salvas com sucesso!');
+  };
+
+  const handleResetConfig = () => {
+    updateHumanizationConfig({
+      enabled: true,
+      messageLength: 'medias',
+      emojiUsage: 'moderado',
+      abbreviations: 'desativado',
+      lowercaseStart: 'desativado',
+      typoSimulation: 'desativado',
+    });
+    toast.info('Configurações restauradas para o padrão');
+  };
 
   return (
     <div className="space-y-6">
@@ -38,12 +66,22 @@ export function HumanizationSection() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Label htmlFor="humanization-enabled">Ativar Humanização</Label>
-          <Switch
-            id="humanization-enabled"
-            checked={humanizationConfig.enabled}
-            onCheckedChange={(enabled) => updateHumanizationConfig({ enabled })}
-          />
+          <Button variant="outline" size="sm" onClick={handleResetConfig}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Restaurar
+          </Button>
+          <Button size="sm" onClick={handleSaveConfig}>
+            <Save className="w-4 h-4 mr-2" />
+            Salvar
+          </Button>
+          <div className="flex items-center gap-2 ml-4">
+            <Label htmlFor="humanization-enabled">Ativar</Label>
+            <Switch
+              id="humanization-enabled"
+              checked={humanizationConfig.enabled}
+              onCheckedChange={(enabled) => updateHumanizationConfig({ enabled })}
+            />
+          </div>
         </div>
       </div>
 
@@ -128,6 +166,9 @@ export function HumanizationSection() {
                   <SelectItem value="sempre">Sempre</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                ⚖️ Emojis profissionais apenas: 👋 ✅ 📅 📞
+              </p>
             </div>
 
             <Separator />
@@ -205,28 +246,40 @@ export function HumanizationSection() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
-              Preview da Mensagem
+              Teste e Preview
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div>
                 <Label className="text-muted-foreground text-xs">MENSAGEM ORIGINAL</Label>
-                <div className="mt-1 p-3 bg-muted/50 rounded-lg text-sm">
-                  Olá! Obrigado por entrar em contato. Entendi que você está buscando orientação sobre um processo trabalhista. Poderia me informar há quanto tempo você foi desligado da empresa? Essa informação é importante para analisarmos seu caso.
-                </div>
+                <textarea
+                  value={testInput}
+                  onChange={(e) => setTestInput(e.target.value)}
+                  className="mt-1 w-full p-3 bg-muted/50 rounded-lg text-sm min-h-[100px] border resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Digite uma mensagem para testar..."
+                />
               </div>
+              
+              <Button 
+                onClick={handleTestHumanization} 
+                className="w-full"
+                disabled={!humanizationConfig.enabled || !testInput}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Humanizar Texto
+              </Button>
               
               <Separator />
               
               <div>
                 <Label className="text-muted-foreground text-xs">MENSAGEM HUMANIZADA</Label>
-                <div className={`mt-1 p-3 rounded-lg text-sm ${
+                <div className={`mt-1 p-3 rounded-lg text-sm min-h-[100px] ${
                   humanizationConfig.enabled 
                     ? 'bg-primary/10 border border-primary/20' 
                     : 'bg-muted/50'
                 }`}>
-                  {preview}
+                  {humanizedOutput || preview}
                 </div>
               </div>
 
@@ -241,6 +294,16 @@ export function HumanizationSection() {
                   {humanizationConfig.abbreviations !== 'desativado' && (
                     <Badge variant="secondary" className="text-xs">
                       Abreviações: {humanizationConfig.abbreviations}
+                    </Badge>
+                  )}
+                  {humanizationConfig.lowercaseStart !== 'desativado' && (
+                    <Badge variant="secondary" className="text-xs">
+                      Minúsculas: {humanizationConfig.lowercaseStart}
+                    </Badge>
+                  )}
+                  {humanizationConfig.typoSimulation !== 'desativado' && (
+                    <Badge variant="secondary" className="text-xs">
+                      Erros: {humanizationConfig.typoSimulation}
                     </Badge>
                   )}
                 </div>
