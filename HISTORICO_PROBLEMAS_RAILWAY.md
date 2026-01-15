@@ -311,5 +311,45 @@ O servidor Express está rodando corretamente (logs confirmam), mas o Railway re
 
 ---
 
+---
+
+## 💡 ANÁLISE EXTERNA (ChatGPT)
+
+### Diagnóstico:
+O problema **NÃO é técnico** (código, porta, variáveis, etc.), mas sim **arquitetural**.
+
+**Railway não é adequado para servir SPAs React com servidor customizado**, mesmo quando:
+- ✅ Container sobe
+- ✅ Porta está correta
+- ✅ Processo está vivo
+- ✅ Servidor responde internamente
+
+O **502 Bad Gateway** é um problema conhecido do proxy do Railway com apps estáticos/SPA (há issues oficiais sobre isso).
+
+### Solução Recomendada:
+**Arquitetura Híbrida:**
+- 🟢 **Frontend (React SPA)** → **Vercel** ou **Netlify**
+- 🟢 **Backend (Fastify API)** → **Railway** (mantém)
+- 🟢 **PostgreSQL** → **Railway** (mantém)
+
+### Por que funciona:
+- Vercel/Netlify são otimizados para SPAs React
+- Deploy automático do GitHub
+- CDN global
+- Sem problemas de proxy
+- Gratuito para projetos pequenos/médios
+
+### Arquitetura Final:
+```
+[ Frontend React (Vercel) ]
+           |
+           | HTTPS
+           v
+[ Backend Fastify (Railway) ] ---> [ PostgreSQL (Railway) ]
+```
+
+---
+
 **Data:** 15/01/2026
-**Status:** 🔴 Problema não resolvido - Servidor roda, mas Railway retorna 502
+**Status:** 🔴 Problema identificado como limitação do Railway com SPAs
+**Solução:** Migrar frontend para Vercel/Netlify
