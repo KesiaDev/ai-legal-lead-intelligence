@@ -6,6 +6,7 @@ import { CommunicationSection } from '@/components/agent/sections/CommunicationS
 import { HumanizationSection } from '@/components/agent/sections/HumanizationSection';
 import { VoiceConfigSection } from '@/components/agent/sections/VoiceConfigSection';
 import { PromptsSection } from '@/components/agent/sections/PromptsSection';
+import { TemplatesSection } from '@/components/agent/sections/TemplatesSection';
 import { KnowledgeBaseSection } from '@/components/agent/sections/KnowledgeBaseSection';
 import { FollowUpSection } from '@/components/agent/sections/FollowUpSection';
 import { ScheduleConfigSection } from '@/components/agent/sections/ScheduleConfigSection';
@@ -28,6 +29,8 @@ export function AgentConfigView() {
         return <VoiceConfigSection />;
       case 'prompts':
         return <PromptsSection />;
+      case 'templates':
+        return <TemplatesSection />;
       case 'knowledge':
         return <KnowledgeBaseSection />;
       case 'followup':

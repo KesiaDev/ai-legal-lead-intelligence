@@ -84,6 +84,7 @@ export type AgentSection =
   | 'humanization'
   | 'voice'
   | 'prompts' 
+  | 'templates'
   | 'knowledge' 
   | 'followup' 
   | 'schedule' 
