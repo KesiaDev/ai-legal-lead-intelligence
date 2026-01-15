@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Copy server.js explicitly (in case it's ignored)
+COPY server.js ./server.js
+
 # Build the app
 RUN npm run build
 
@@ -28,7 +31,7 @@ RUN npm ci --only=production
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/server.js ./
 
 # Expose port (Railway will set PORT env var)
 EXPOSE 8080
