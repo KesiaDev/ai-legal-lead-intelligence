@@ -1,0 +1,233 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Multi-tenancy
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  plan      String   @default("free") // free, pro, enterprise
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  leads         Lead[]
+  conversations Conversation[]
+  pipelineStages PipelineStage[]
+
+  @@map("tenants")
+}
+
+// Usuários
+model User {
+  id        String   @id @default(uuid())
+  tenantId  String
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("operator") // admin, operator, lawyer
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedLeads Lead[]
+  conversations Conversation[]
+  pipelineTransitions PipelineTransition[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// Leads
+model Lead {
+  id               String   @id @default(uuid())
+  tenantId         String
+  name             String
+  phone            String
+  email            String?
+  city             String?
+  state            String?
+  legalArea        String?  // Área principal do Direito (ver lista completa)
+  customLegalArea  String?  // Especialização customizada quando legalArea = 'outra'
+  caseType         String?  // Tipo específico do caso
+  demandDescription String? @db.Text
+  urgency          String?  // baixa, media, alta
+  status           String   @default("novo") // novo, triagem, qualificado, etc.
+  pipelineStage    String?  // ID do estágio atual
+  origin           String?  // whatsapp, instagram, site, indicacao
+  estimatedTicket  Float?
+  riskScore        Int?     @default(0) // 0-100
+  riskLevel        String?  // baixo, medio, alto
+  tags             String[] @default([])
+  contactPreference String?
+  availableForHumanContact Boolean @default(false)
+  lgpdConsent      Boolean  @default(false)
+  lgpdConsentDate  DateTime?
+  assignedTo       String?
+  assignedType     String?  // ai, human, hybrid
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedUser      User?             @relation(fields: [assignedTo], references: [id])
+  conversations     Conversation[]
+  pipelineTransitions PipelineTransition[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([pipelineStage])
+  @@index([assignedTo])
+  @@map("leads")
+}
+
+// Pipeline Jurídico
+model PipelineStage {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  order       Int
+  color       String
+  description String?
+  isActive    Boolean  @default(true)
+  autoActions Json?    // Ações automáticas ao entrar no estágio
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transitions PipelineTransition[]
+
+  @@index([tenantId])
+  @@unique([tenantId, order])
+  @@map("pipeline_stages")
+}
+
+// Transições de Pipeline
+model PipelineTransition {
+  id        String   @id @default(uuid())
+  leadId    String
+  fromStage String?
+  toStage   String
+  userId    String?
+  reason    String?
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  lead      Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user      User?   @relation(fields: [userId], references: [id])
+  stage     PipelineStage @relation(fields: [toStage], references: [id])
+
+  @@index([leadId])
+  @@index([toStage])
+  @@map("pipeline_transitions")
+}
+
+// Conversas
+model Conversation {
+  id              String   @id @default(uuid())
+  tenantId        String
+  leadId          String
+  channel         String   // whatsapp, instagram, site, chat
+  status          String   @default("active") // active, paused, closed
+  assignedTo      String?
+  assignedType    String   @default("ai") // ai, human, hybrid
+  slaDeadline     DateTime?
+  firstResponseTime Int?   // em segundos
+  averageResponseTime Float?
+  satisfactionScore Int?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead    Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [assignedTo], references: [id])
+  messages Message[]
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([status])
+  @@index([assignedTo])
+  @@map("conversations")
+}
+
+// Mensagens
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  content        String   @db.Text
+  senderType     String   // lead, ai, human
+  senderId       String?
+  isAI           Boolean  @default(false)
+  metadata       Json?    // Análise de IA, anexos, etc.
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// Follow-ups
+model FollowUp {
+  id          String   @id @default(uuid())
+  leadId      String
+  scheduledFor DateTime
+  status      String   @default("pending") // pending, sent, responded, completed
+  message     String   @db.Text
+  sentAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([status])
+  @@index([scheduledFor])
+  @@map("follow_ups")
+}
+
+// Análises de IA
+model AIAnalysis {
+  id              String   @id @default(uuid())
+  leadId          String?
+  messageId       String?
+  legalArea       String?
+  urgency         String?
+  intent          String?  // contratar, informacao, comparacao, urgencia
+  riskScore       Int?
+  summary         String?  @db.Text
+  suggestions     String[] @default([])
+  confidence      Float?
+  createdAt       DateTime @default(now())
+
+  @@index([leadId])
+  @@index([messageId])
+  @@map("ai_analyses")
+}
+
+// Auditoria
+model AuditLog {
+  id           String   @id @default(uuid())
+  tenantId     String
+  userId       String?
+  resourceType String   // lead, conversation, message, etc.
+  resourceId   String
+  action       String   // create, update, delete, transition
+  changes      Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

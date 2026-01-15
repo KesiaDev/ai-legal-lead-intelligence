@@ -67,7 +67,10 @@ export function KnowledgeBaseSection() {
     priority: 'media' as 'alta' | 'media' | 'baixa',
   });
 
-  const extendedKnowledgeBase: ExtendedKnowledgeItem[] = knowledgeBase.map(item => ({
+  // Safe fallback for knowledgeBase
+  const safeKnowledgeBase = knowledgeBase || [];
+  
+  const extendedKnowledgeBase: ExtendedKnowledgeItem[] = safeKnowledgeBase.map(item => ({
     ...item,
     category: (item as any).category || 'geral',
     legalArea: (item as any).legalArea || '',

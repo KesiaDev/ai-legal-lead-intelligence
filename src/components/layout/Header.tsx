@@ -1,7 +1,17 @@
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, LogOut, User } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useLeads } from '@/contexts/LeadsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   title: string;
@@ -10,7 +20,24 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const { leads } = useLeads();
-  const urgentCount = leads.filter(l => l.status === 'urgente').length;
+  const { user, tenant, logout } = useAuth();
+  const navigate = useNavigate();
+  const urgentCount = leads.filter((l: any) => l.status === 'urgente' || l.urgency === 'alta').length;
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const getUserInitials = () => {
+    if (!user?.name) return 'U';
+    return user.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <header className="h-16 border-b border-border bg-card px-6 flex items-center justify-between">
@@ -41,9 +68,40 @@ export function Header({ title, subtitle }: HeaderProps) {
           )}
         </Button>
 
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium">
-          AD
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium">
+                {getUserInitials()}
+              </div>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user?.name}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user?.email}
+                </p>
+                {tenant && (
+                  <p className="text-xs leading-none text-muted-foreground mt-1">
+                    {tenant.name}
+                  </p>
+                )}
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
+              <span>Perfil</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Sair</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

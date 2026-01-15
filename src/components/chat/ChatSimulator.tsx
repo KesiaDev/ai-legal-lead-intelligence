@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, generateUUID } from '@/lib/utils';
 import { useLeads } from '@/contexts/LeadsContext';
 import { useAgent } from '@/contexts/AgentContext';
 import { LegalArea, Urgency, ConversationStep } from '@/types/lead';
+import { getLegalAreasAsOptions } from '@/types/legalAreas';
 import { 
   analyzeMessage, 
   rewriteAgentMessage, 
@@ -42,7 +43,7 @@ const CONVERSATION_FLOW: ConversationStep[] = [
     id: 'area',
     type: 'area',
     question: 'Agora, por favor, selecione a área do Direito relacionada à sua demanda:',
-    options: ['Direito Trabalhista', 'Direito Previdenciário', 'Direito de Família', 'Direito Cível', 'Direito Penal'],
+    options: getLegalAreasAsOptions().slice(0, 10).map(opt => opt.label), // Mostrar primeiras 10 áreas principais
   },
   {
     id: 'demand',
@@ -80,14 +81,10 @@ const CONVERSATION_FLOW: ConversationStep[] = [
 ];
 
 const mapAreaToKey = (area: string): LegalArea => {
-  const mapping: Record<string, LegalArea> = {
-    'Direito Trabalhista': 'trabalhista',
-    'Direito Previdenciário': 'previdenciario',
-    'Direito de Família': 'familia',
-    'Direito Cível': 'civel',
-    'Direito Penal': 'penal',
-  };
-  return mapping[area] || 'civel';
+  // Buscar no mapeamento completo de áreas
+  const areas = getLegalAreasAsOptions();
+  const found = areas.find(opt => opt.label === area);
+  return found ? (found.value as LegalArea) : 'civil';
 };
 
 const mapUrgencyToKey = (urgency: string): Urgency => {
@@ -109,13 +106,23 @@ export function ChatSimulator() {
   const [lastAnalysis, setLastAnalysis] = useState<AIAnalysisResult | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Safe fallback for agent
+  const safeAgent = agent || {
+    aiConfig: {
+      enabled: false,
+      interventionLevel: 'medio' as const,
+    },
+  };
+
   // Sync AI config with agent settings
   useEffect(() => {
-    updateAIConfig({
-      enabled: agent.aiConfig.enabled,
-      interventionLevel: agent.aiConfig.interventionLevel,
-    });
-  }, [agent.aiConfig]);
+    if (agent?.aiConfig) {
+      updateAIConfig({
+        enabled: safeAgent.aiConfig.enabled,
+        interventionLevel: safeAgent.aiConfig.interventionLevel,
+      });
+    }
+  }, [agent?.aiConfig]);
 
   useEffect(() => {
     // Start conversation
@@ -130,7 +137,7 @@ export function ChatSimulator() {
 
   const addBotMessage = (content: string, options?: string[], aiAnalysis?: AIAnalysisDisplay) => {
     setMessages(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       content,
       sender: 'bot',
       timestamp: new Date(),
@@ -141,7 +148,7 @@ export function ChatSimulator() {
 
   const addUserMessage = (content: string) => {
     setMessages(prev => [...prev, {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       content,
       sender: 'user',
       timestamp: new Date(),
@@ -173,7 +180,7 @@ export function ChatSimulator() {
         newLeadData.demand = response;
         
         // Analyze demand with AI
-        if (agent.aiConfig.enabled) {
+        if (safeAgent.aiConfig.enabled) {
           setIsAnalyzing(true);
           try {
             const analysis = await analyzeMessage(response, currentFlow);
@@ -223,7 +230,7 @@ export function ChatSimulator() {
       let nextQuestion = CONVERSATION_FLOW[nextStep].question;
       let questionOptions = CONVERSATION_FLOW[nextStep].options;
       
-      if (agent.aiConfig.enabled && agent.aiConfig.interventionLevel === 'medio') {
+      if (safeAgent.aiConfig.enabled && safeAgent.aiConfig.interventionLevel === 'medio') {
         try {
           const suggestion = await suggestNextQuestion({
             currentStep: CONVERSATION_FLOW[nextStep],
@@ -255,7 +262,8 @@ export function ChatSimulator() {
         if (CONVERSATION_FLOW[nextStep].type === 'complete') {
           const [city, state] = (newLeadData.location || 'Não informado, -').split(',').map(s => s.trim());
           
-          addLead({
+          try {
+            addLead({
             name: newLeadData.name || 'Lead sem nome',
             phone: '(00) 00000-0000', // Simulated
             city,
@@ -271,6 +279,10 @@ export function ChatSimulator() {
             messages: [],
             followUps: [],
           });
+          } catch (error) {
+            console.error('Error adding lead:', error);
+            addBotMessage('Ocorreu um erro ao salvar seus dados. Por favor, tente novamente.');
+          }
           setIsComplete(true);
         }
       }, 500);
@@ -326,7 +338,7 @@ export function ChatSimulator() {
               <p className="text-xs text-primary-foreground/70">Atendimento Automatizado</p>
             </div>
           </div>
-          {agent.aiConfig.enabled && (
+          {safeAgent.aiConfig.enabled && (
             <Badge variant="outline" className="bg-primary-foreground/10 text-primary-foreground border-primary-foreground/20">
               <Sparkles className="w-3 h-3 mr-1" />
               IA Ativa
@@ -372,7 +384,7 @@ export function ChatSimulator() {
               </div>
               
               {/* AI Analysis Panel */}
-              {message.aiAnalysis && agent.aiConfig.enabled && (
+              {message.aiAnalysis && safeAgent.aiConfig.enabled && (
                 <div className="mt-2 ml-2 p-3 bg-muted/50 rounded-lg border border-border">
                   <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="w-4 h-4 text-primary" />

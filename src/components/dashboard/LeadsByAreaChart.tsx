@@ -1,5 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { useLeads } from '@/contexts/LeadsContext';
+import { useLeads } from '@/hooks/useLeads';
 import { LEGAL_AREAS, LegalArea } from '@/types/lead';
 
 const COLORS = {
@@ -11,13 +11,39 @@ const COLORS = {
 };
 
 export function LeadsByAreaChart() {
-  const { leads } = useLeads();
+  const { leads, isLoading } = useLeads();
+  
+  // Safe fallback
+  const safeLeads = leads || [];
 
   const data = Object.entries(LEGAL_AREAS).map(([key, label]) => ({
     name: label,
-    value: leads.filter(l => l.legalArea === key).length,
+    value: safeLeads.filter(l => l.legalArea === key).length,
     color: COLORS[key as LegalArea],
   })).filter(d => d.value > 0);
+
+  if (isLoading) {
+    return (
+      <div className="card-elevated rounded-xl p-6 animate-slide-up">
+        <div className="h-64 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <div className="card-elevated rounded-xl p-6 animate-slide-up">
+        <h3 className="text-lg font-display font-semibold text-foreground mb-4">
+          Leads por Área do Direito
+        </h3>
+        <div className="h-64 flex items-center justify-center text-muted-foreground">
+          <p>Nenhum lead cadastrado ainda</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card-elevated rounded-xl p-6 animate-slide-up">

@@ -46,6 +46,7 @@ import {
   Video,
   Phone,
 } from 'lucide-react';
+import { getLegalAreasAsOptions } from '@/types/legalAreas';
 
 export function ScheduleConfigSection() {
   const { 
@@ -65,6 +66,28 @@ export function ScheduleConfigSection() {
     updateEventConfig,
   } = useAgent();
 
+  // Safe fallbacks for undefined values
+  const safeScheduleConfig = scheduleConfig || {
+    timezone: 'São Paulo (BRT)',
+    meetingDuration: 60,
+    timeIncrement: 30,
+    minAdvanceTime: 60,
+    maxAdvanceDays: 30,
+    onlyQualifiedLeads: true,
+    availableHours: [],
+  };
+  const safeLawyers = lawyers || [];
+  const safeRotationRules = rotationRules || [];
+  const safeReminders = reminders || [];
+  const safeEventConfig = eventConfig || {
+    title: '',
+    type: 'consulta',
+    location: 'online',
+    description: '',
+    requireConfirmation: false,
+    meetingLink: '',
+  };
+
   const [isLawyerDialogOpen, setIsLawyerDialogOpen] = useState(false);
   const [editingLawyer, setEditingLawyer] = useState<any>(null);
   const [lawyerForm, setLawyerForm] = useState({
@@ -82,15 +105,8 @@ export function ScheduleConfigSection() {
     channel: 'whatsapp' as 'whatsapp' | 'email' | 'sms',
   });
 
-  const legalAreaOptions = [
-    { value: 'trabalhista', label: 'Trabalhista' },
-    { value: 'civil', label: 'Civil' },
-    { value: 'familia', label: 'Família' },
-    { value: 'consumidor', label: 'Consumidor' },
-    { value: 'previdenciario', label: 'Previdenciário' },
-    { value: 'empresarial', label: 'Empresarial' },
-    { value: 'criminal', label: 'Criminal' },
-  ];
+  // Usar todas as áreas do Direito
+  const legalAreaOptions = getLegalAreasAsOptions();
 
   const handleSaveLawyer = () => {
     if (editingLawyer) {
@@ -188,7 +204,7 @@ export function ScheduleConfigSection() {
                 <div className="space-y-2">
                   <Label>Fuso Horário</Label>
                   <Select
-                    value={scheduleConfig.timezone}
+                    value={safeScheduleConfig.timezone}
                     onValueChange={(value) => updateScheduleConfig({ timezone: value })}
                   >
                     <SelectTrigger>
@@ -206,7 +222,7 @@ export function ScheduleConfigSection() {
                   <Label>Duração da Reunião (minutos)</Label>
                   <Input
                     type="number"
-                    value={scheduleConfig.meetingDuration}
+                    value={safeScheduleConfig.meetingDuration}
                     onChange={(e) => updateScheduleConfig({ meetingDuration: Number(e.target.value) })}
                   />
                 </div>
@@ -215,7 +231,7 @@ export function ScheduleConfigSection() {
                   <Label>Incrementos de Horário (minutos)</Label>
                   <Input
                     type="number"
-                    value={scheduleConfig.timeIncrement}
+                    value={safeScheduleConfig.timeIncrement}
                     onChange={(e) => updateScheduleConfig({ timeIncrement: Number(e.target.value) })}
                   />
                 </div>
@@ -224,7 +240,7 @@ export function ScheduleConfigSection() {
                   <Label>Antecedência Mínima (minutos)</Label>
                   <Input
                     type="number"
-                    value={scheduleConfig.minAdvanceTime}
+                    value={safeScheduleConfig.minAdvanceTime}
                     onChange={(e) => updateScheduleConfig({ minAdvanceTime: Number(e.target.value) })}
                   />
                 </div>
@@ -233,7 +249,7 @@ export function ScheduleConfigSection() {
                   <Label>Antecedência Máxima (dias)</Label>
                   <Input
                     type="number"
-                    value={scheduleConfig.maxAdvanceDays}
+                    value={safeScheduleConfig.maxAdvanceDays}
                     onChange={(e) => updateScheduleConfig({ maxAdvanceDays: Number(e.target.value) })}
                   />
                 </div>
@@ -242,7 +258,7 @@ export function ScheduleConfigSection() {
               <div className="flex items-center gap-3 p-4 border rounded-lg bg-accent/30 mt-6">
                 <Checkbox
                   id="qualified-only"
-                  checked={scheduleConfig.onlyQualifiedLeads}
+                  checked={safeScheduleConfig.onlyQualifiedLeads}
                   onCheckedChange={(checked) => 
                     updateScheduleConfig({ onlyQualifiedLeads: checked as boolean })
                   }
@@ -269,7 +285,7 @@ export function ScheduleConfigSection() {
                 <div className="space-y-2">
                   <Label>Título do Evento</Label>
                   <Input
-                    value={eventConfig.title}
+                    value={safeEventConfig.title}
                     onChange={(e) => updateEventConfig({ title: e.target.value })}
                     placeholder="Ex: Consulta Inicial"
                   />
@@ -278,7 +294,7 @@ export function ScheduleConfigSection() {
                 <div className="space-y-2">
                   <Label>Tipo de Evento</Label>
                   <Select
-                    value={eventConfig.type}
+                    value={safeEventConfig.type}
                     onValueChange={(value: any) => updateEventConfig({ type: value })}
                   >
                     <SelectTrigger>
@@ -295,7 +311,7 @@ export function ScheduleConfigSection() {
                 <div className="space-y-2">
                   <Label>Local</Label>
                   <Select
-                    value={eventConfig.location}
+                    value={safeEventConfig.location}
                     onValueChange={(value: any) => updateEventConfig({ location: value })}
                   >
                     <SelectTrigger>
@@ -324,11 +340,11 @@ export function ScheduleConfigSection() {
                   </Select>
                 </div>
 
-                {eventConfig.location === 'online' && (
+                {safeEventConfig.location === 'online' && (
                   <div className="space-y-2">
                     <Label>Link da Reunião</Label>
                     <Input
-                      value={eventConfig.meetingLink || ''}
+                      value={safeEventConfig.meetingLink || ''}
                       onChange={(e) => updateEventConfig({ meetingLink: e.target.value })}
                       placeholder="https://meet.google.com/..."
                     />
@@ -339,7 +355,7 @@ export function ScheduleConfigSection() {
               <div className="space-y-2">
                 <Label>Descrição do Evento</Label>
                 <Textarea
-                  value={eventConfig.description}
+                  value={safeEventConfig.description}
                   onChange={(e) => updateEventConfig({ description: e.target.value })}
                   rows={3}
                 />
@@ -348,7 +364,7 @@ export function ScheduleConfigSection() {
               <div className="flex items-center gap-3 p-4 border rounded-lg bg-accent/30">
                 <Checkbox
                   id="require-confirmation"
-                  checked={eventConfig.requireConfirmation}
+                  checked={safeEventConfig.requireConfirmation}
                   onCheckedChange={(checked) => 
                     updateEventConfig({ requireConfirmation: checked as boolean })
                   }
@@ -372,7 +388,7 @@ export function ScheduleConfigSection() {
               </div>
 
               <div className="space-y-3">
-                {scheduleConfig.availableHours.map((hour, index) => (
+                {safeScheduleConfig.availableHours.map((hour, index) => (
                   <div key={hour.day} className="flex items-center gap-4 p-3 border rounded-lg">
                     <div className="w-12">
                       <span className="font-medium">{hour.day}</span>
@@ -380,7 +396,7 @@ export function ScheduleConfigSection() {
                     <Switch
                       checked={hour.isOpen}
                       onCheckedChange={(checked) => {
-                        const updated = [...scheduleConfig.availableHours];
+                        const updated = [...safeScheduleConfig.availableHours];
                         updated[index] = { ...hour, isOpen: checked };
                         updateScheduleConfig({ availableHours: updated });
                       }}
@@ -391,7 +407,7 @@ export function ScheduleConfigSection() {
                           type="time"
                           value={hour.startTime}
                           onChange={(e) => {
-                            const updated = [...scheduleConfig.availableHours];
+                            const updated = [...safeScheduleConfig.availableHours];
                             updated[index] = { ...hour, startTime: e.target.value };
                             updateScheduleConfig({ availableHours: updated });
                           }}
@@ -402,7 +418,7 @@ export function ScheduleConfigSection() {
                           type="time"
                           value={hour.endTime}
                           onChange={(e) => {
-                            const updated = [...scheduleConfig.availableHours];
+                            const updated = [...safeScheduleConfig.availableHours];
                             updated[index] = { ...hour, endTime: e.target.value };
                             updateScheduleConfig({ availableHours: updated });
                           }}
@@ -433,7 +449,12 @@ export function ScheduleConfigSection() {
 
               {/* Lawyers List */}
               <div className="space-y-3">
-                {lawyers.map((lawyer) => (
+                {safeLawyers.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    Nenhum advogado cadastrado. Adicione um advogado para começar.
+                  </p>
+                ) : (
+                  safeLawyers.map((lawyer) => (
                   <Card key={lawyer.id}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -487,7 +508,8 @@ export function ScheduleConfigSection() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  ))
+                )}
               </div>
 
               {/* Rotation Rules */}
@@ -497,7 +519,12 @@ export function ScheduleConfigSection() {
                   Regras de Rodízio
                 </h4>
                 <div className="space-y-2">
-                  {rotationRules.map((rule) => (
+                  {safeRotationRules.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Nenhuma regra de rodízio configurada.
+                    </p>
+                  ) : (
+                    safeRotationRules.map((rule) => (
                     <div key={rule.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <RefreshCw className="w-4 h-4 text-muted-foreground" />
@@ -516,7 +543,8 @@ export function ScheduleConfigSection() {
                         onCheckedChange={(checked) => updateRotationRule(rule.id, { isActive: checked })}
                       />
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             </TabsContent>
@@ -535,7 +563,12 @@ export function ScheduleConfigSection() {
               </div>
 
               <div className="space-y-3">
-                {reminders.map((reminder) => (
+                {safeReminders.length === 0 ? (
+                  <p className="text-center py-8 text-muted-foreground">
+                    Nenhum lembrete configurado. Adicione um lembrete para começar.
+                  </p>
+                ) : (
+                  safeReminders.map((reminder) => (
                   <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <Bell className="w-5 h-5 text-muted-foreground" />
@@ -565,7 +598,8 @@ export function ScheduleConfigSection() {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </TabsContent>
           </CardContent>

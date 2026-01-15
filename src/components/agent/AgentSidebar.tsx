@@ -38,6 +38,9 @@ export function AgentSidebar({ currentSection, onSectionChange }: AgentSidebarPr
   const [expanded, setExpanded] = useState(true);
   const { agent } = useAgent();
 
+  // Safe fallback for agent
+  const safeAgent = agent || { name: 'SDR Jurídico' };
+
   return (
     <div className="border-r border-border bg-card h-full w-64 flex flex-col">
       {/* Agent Header */}
@@ -52,7 +55,7 @@ export function AgentSidebar({ currentSection, onSectionChange }: AgentSidebarPr
           <div className="w-8 h-8 rounded-lg bg-success/20 flex items-center justify-center">
             <Bot className="w-4 h-4 text-success" />
           </div>
-          <span className="font-medium text-sm flex-1 text-left">{agent.name}</span>
+          <span className="font-medium text-sm flex-1 text-left">{safeAgent.name}</span>
           {expanded ? (
             <ChevronDown className="w-4 h-4 text-muted-foreground" />
           ) : (

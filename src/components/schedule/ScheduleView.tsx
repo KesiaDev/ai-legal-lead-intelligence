@@ -9,7 +9,9 @@ import { cn } from '@/lib/utils';
 export function ScheduleView() {
   const { leads } = useLeads();
   
-  const scheduledLeads = leads.filter(l => l.scheduledContact || l.availableForHumanContact);
+  // Safe fallback for leads
+  const safeLeads = leads || [];
+  const scheduledLeads = safeLeads.filter(l => l.scheduledContact || l.availableForHumanContact);
   const today = new Date();
   const weekStart = startOfWeek(today, { locale: ptBR });
   

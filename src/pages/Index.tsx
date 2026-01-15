@@ -97,8 +97,11 @@ function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
   const { leads, setSelectedLead } = useLeads();
 
+  // Safe fallback for leads (já vem do context que usa API)
+  const safeLeads = leads || [];
+
   const handleSelectLead = (leadId: string) => {
-    const lead = leads.find(l => l.id === leadId);
+    const lead = safeLeads.find(l => l.id === leadId);
     setSelectedLead(lead || null);
     setCurrentView('leads');
   };
@@ -119,7 +122,7 @@ function AppContent() {
   const getViewSubtitle = () => {
     switch (currentView) {
       case 'dashboard': return 'Visão geral do seu funil de leads';
-      case 'leads': return `${leads.length} leads no sistema`;
+      case 'leads': return `${safeLeads.length} leads no sistema`;
       case 'conversations': return 'Simulador de atendimento';
       default: return undefined;
     }
