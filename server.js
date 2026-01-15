@@ -1,7 +1,7 @@
 import express from 'express';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 8080;
 console.log('Environment PORT:', process.env.PORT);
 console.log('Using PORT:', PORT);
 console.log('__dirname:', __dirname);
-console.log('dist exists:', require('fs').existsSync(join(__dirname, 'dist')));
+console.log('dist exists:', existsSync(join(__dirname, 'dist')));
 
 // Health check endpoint
 app.get('/health', (req, res) => {
