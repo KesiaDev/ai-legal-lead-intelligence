@@ -2,10 +2,10 @@
 nixPkgs = ["nodejs-18_x", "npm"]
 
 [phases.install]
-cmds = ["npm ci"]
+cmds = ["npm ci --production"]
 
 [phases.build]
-cmds = ["npm run db:generate", "npm run build"]
+cmds = ["npm run db:generate"]
 
 [start]
-cmd = "npm start"
+cmd = "node dist/server.js"
