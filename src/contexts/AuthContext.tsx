@@ -26,13 +26,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Em desenvolvimento, cria um usuário mock
+const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+const mockUser: User = {
+  id: 'dev-user-1',
+  email: 'dev@example.com',
+  name: 'Usuário Desenvolvimento',
+  role: 'admin',
+};
+const mockTenant: Tenant = {
+  id: 'dev-tenant-1',
+  name: 'Escritório Dev',
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [tenant, setTenant] = useState<Tenant | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(isDevelopment ? mockUser : null);
+  const [tenant, setTenant] = useState<Tenant | null>(isDevelopment ? mockTenant : null);
+  const [isLoading, setIsLoading] = useState(!isDevelopment);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Em desenvolvimento, não precisa verificar token
+    if (isDevelopment) {
+      setIsLoading(false);
+      return;
+    }
+
     // Verificar se há token salvo e buscar dados do usuário
     const token = authApi.getToken();
     if (token) {

@@ -7,8 +7,16 @@ interface ProtectedRouteProps {
   children: ReactNode;
 }
 
+// Em desenvolvimento, permite acesso sem autenticação
+const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
+
+  // Em desenvolvimento, permite acesso direto
+  if (isDevelopment) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
