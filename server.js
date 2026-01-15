@@ -12,6 +12,13 @@ const PORT = process.env.PORT || 8080;
 // Log para debug
 console.log('Environment PORT:', process.env.PORT);
 console.log('Using PORT:', PORT);
+console.log('__dirname:', __dirname);
+console.log('dist exists:', require('fs').existsSync(join(__dirname, 'dist')));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', port: PORT, timestamp: new Date().toISOString() });
+});
 
 // Servir arquivos estáticos da pasta dist
 app.use(express.static(join(__dirname, 'dist')));
@@ -19,11 +26,14 @@ app.use(express.static(join(__dirname, 'dist')));
 // SPA fallback: todas as rotas retornam index.html
 app.get('*', (req, res) => {
   try {
-    const indexHtml = readFileSync(join(__dirname, 'dist', 'index.html'), 'utf-8');
+    const indexPath = join(__dirname, 'dist', 'index.html');
+    console.log('Serving index.html from:', indexPath);
+    const indexHtml = readFileSync(indexPath, 'utf-8');
     res.setHeader('Content-Type', 'text/html');
     res.send(indexHtml);
   } catch (error) {
-    res.status(500).send('Error loading index.html');
+    console.error('Error loading index.html:', error);
+    res.status(500).send(`Error loading index.html: ${error.message}`);
   }
 });
 
