@@ -15,9 +15,15 @@ console.log('Using PORT:', PORT);
 console.log('__dirname:', __dirname);
 console.log('dist exists:', existsSync(join(__dirname, 'dist')));
 
-// Health check endpoint
+// Health check endpoint (Railway usa isso para verificar se o servidor está pronto)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', port: PORT, timestamp: new Date().toISOString() });
+});
+
+// Root endpoint também deve responder
+app.get('/', (req, res, next) => {
+  // Deixa o express.static e o fallback tratar
+  next();
 });
 
 // Servir arquivos estáticos da pasta dist
@@ -37,6 +43,14 @@ app.get('*', (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`📁 Serving files from: ${join(__dirname, 'dist')}`);
+  console.log(`✅ Health check available at: http://0.0.0.0:${PORT}/health`);
+});
+
+// Tratamento de erros
+server.on('error', (error) => {
+  console.error('Server error:', error);
+  process.exit(1);
 });
