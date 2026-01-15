@@ -33,6 +33,10 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server.js ./
 
+# Verificar se dist existe e tem conteúdo
+RUN ls -la dist/ || echo "dist folder not found"
+RUN ls -la dist/index.html || echo "index.html not found"
+
 # Expose port (Railway will set PORT env var)
 EXPOSE 8080
 
