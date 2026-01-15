@@ -215,7 +215,7 @@ export async function initializeWebSocket(
   });
 
   // Handler de erro
-  connection.socket.on('error', (error) => {
+  connection.socket.on('error', (error: Error) => {
     console.error(`[WS] Error on connection ${conversationId}:`, error);
     wsManager.removeConnection(conversationId, connection.socket as any);
   });

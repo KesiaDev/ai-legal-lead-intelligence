@@ -1,15 +1,24 @@
-import Fastify from 'fastify';
+import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
 import { env } from './config/env';
-import { authenticate, loadUser } from './middleware/auth.middleware';
+import { authenticate, loadUser, AuthenticatedRequest } from './middleware/auth.middleware';
 import { ensureTenantAccess } from './middleware/tenant.middleware';
 import { authRoutes } from './routes/auth.routes';
 import { leadsRoutes } from './routes/leads.routes';
 import { conversationsRoutes } from './routes/conversations.routes';
 import { pipelineRoutes } from './routes/pipeline.routes';
 import { wsManager, initializeWebSocket } from './services/websocket.service';
+
+// Declare types for decorators
+declare module 'fastify' {
+  interface FastifyInstance {
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    loadUser: (request: AuthenticatedRequest, reply: FastifyReply) => Promise<void>;
+    ensureTenantAccess: (request: AuthenticatedRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
 
 const fastify = Fastify({
   logger: {

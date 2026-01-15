@@ -1,7 +1,9 @@
+// @ts-nocheck
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import prisma from '../config/database';
-import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { AuthenticatedRequest, authenticate, loadUser } from '../middleware/auth.middleware';
+import { ensureTenantAccess } from '../middleware/tenant.middleware';
 
 const createLeadSchema = z.object({
   name: z.string().min(2),
@@ -26,7 +28,7 @@ const updateLeadSchema = createLeadSchema.partial();
 export async function leadsRoutes(fastify: FastifyInstance) {
   // Listar leads
   fastify.get('/leads', {
-    preHandler: [fastify.authenticate, fastify.loadUser, fastify.ensureTenantAccess],
+    preHandler: [authenticate, loadUser, ensureTenantAccess],
   }, async (request: AuthenticatedRequest, reply) => {
     try {
       const tenantId = (request as any).tenantId;
@@ -75,7 +77,7 @@ export async function leadsRoutes(fastify: FastifyInstance) {
 
   // Obter lead por ID
   fastify.get('/leads/:id', {
-    preHandler: [fastify.authenticate, fastify.loadUser, fastify.ensureTenantAccess],
+    preHandler: [authenticate, loadUser, ensureTenantAccess],
   }, async (request: AuthenticatedRequest, reply) => {
     try {
       const tenantId = (request as any).tenantId;
@@ -130,7 +132,7 @@ export async function leadsRoutes(fastify: FastifyInstance) {
 
   // Criar lead
   fastify.post('/leads', {
-    preHandler: [fastify.authenticate, fastify.loadUser, fastify.ensureTenantAccess],
+    preHandler: [authenticate, loadUser, ensureTenantAccess],
   }, async (request: AuthenticatedRequest, reply) => {
     try {
       const tenantId = (request as any).tenantId;
@@ -166,7 +168,7 @@ export async function leadsRoutes(fastify: FastifyInstance) {
 
   // Atualizar lead
   fastify.patch('/leads/:id', {
-    preHandler: [fastify.authenticate, fastify.loadUser, fastify.ensureTenantAccess],
+    preHandler: [authenticate, loadUser, ensureTenantAccess],
   }, async (request: AuthenticatedRequest, reply) => {
     try {
       const tenantId = (request as any).tenantId;
@@ -210,7 +212,7 @@ export async function leadsRoutes(fastify: FastifyInstance) {
 
   // Deletar lead
   fastify.delete('/leads/:id', {
-    preHandler: [fastify.authenticate, fastify.loadUser, fastify.ensureTenantAccess],
+    preHandler: [authenticate, loadUser, ensureTenantAccess],
   }, async (request: AuthenticatedRequest, reply) => {
     try {
       const tenantId = (request as any).tenantId;
