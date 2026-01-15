@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import formbody from '@fastify/formbody';
 import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
 import bcrypt from 'bcryptjs';
@@ -14,10 +15,35 @@ const fastify = Fastify({
 
 // Registrar plugins
 async function build() {
-  // CORS - suporta múltiplas origens separadas por vírgula
-  const corsOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+  // FormBody - parser de JSON e form-data (OBRIGATÓRIO para POST em produção)
+  await fastify.register(formbody);
+
+  // Parser explícito de JSON (garantia extra)
+  fastify.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (req, body, done) => {
+      try {
+        const json = JSON.parse(body as string);
+        done(null, json);
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    }
+  );
+
+  // CORS - suporta múltiplas origens com callback (melhor para produção)
+  const allowedOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
   await fastify.register(cors, {
-    origin: corsOrigins.length === 1 ? corsOrigins[0] : corsOrigins,
+    origin: (origin, cb) => {
+      // Permitir requisições sem origin (mobile apps, Postman, etc)
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Not allowed by CORS'), false);
+      }
+    },
     credentials: true,
   });
 
@@ -54,14 +80,27 @@ async function build() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
-  // Rotas de autenticação (simplificadas por enquanto)
+  // Rotas de autenticação
   fastify.post('/register', async (request: any, reply: any) => {
     try {
+      // Log do body para debug
+      fastify.log.info({ body: request.body, headers: request.headers }, 'REGISTER REQUEST');
+      
       const body = request.body as any;
-      const { email, name, password, tenantName } = body || {};
+      
+      // Validação explícita do body
+      if (!body || typeof body !== 'object') {
+        fastify.log.warn({ body }, 'Invalid body in register');
+        return reply.status(400).send({ error: 'Invalid request body' });
+      }
+
+      const { email, name, password, tenantName } = body;
       
       if (!email || !name || !password || !tenantName) {
-        return reply.status(400).send({ error: 'Missing required fields' });
+        return reply.status(400).send({ 
+          error: 'Missing required fields',
+          required: ['email', 'name', 'password', 'tenantName']
+        });
       }
 
       const existingUser = await prisma.user.findUnique({
@@ -114,11 +153,24 @@ async function build() {
 
   fastify.post('/login', async (request: any, reply: any) => {
     try {
+      // Log do body para debug
+      fastify.log.info({ body: request.body, headers: request.headers }, 'LOGIN REQUEST');
+      
       const body = request.body as any;
-      const { email, password } = body || {};
+      
+      // Validação explícita do body
+      if (!body || typeof body !== 'object') {
+        fastify.log.warn({ body }, 'Invalid body in login');
+        return reply.status(400).send({ error: 'Invalid request body' });
+      }
+
+      const { email, password } = body;
 
       if (!email || !password) {
-        return reply.status(400).send({ error: 'Email and password required' });
+        return reply.status(400).send({ 
+          error: 'Email and password required',
+          received: { hasEmail: !!email, hasPassword: !!password }
+        });
       }
 
       const user = await prisma.user.findUnique({
