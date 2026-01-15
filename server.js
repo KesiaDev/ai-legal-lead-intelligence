@@ -9,6 +9,10 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Log para debug
+console.log('Environment PORT:', process.env.PORT);
+console.log('Using PORT:', PORT);
+
 // Servir arquivos estáticos da pasta dist
 app.use(express.static(join(__dirname, 'dist')));
 
