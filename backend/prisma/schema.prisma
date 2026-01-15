@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("user")
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  leads     Lead[]
+}
+
+model Lead {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                    String
+  phone                   String
+  email                   String?
+  city                    String?
+  state                   String?
+  legalArea               String?
+  customLegalArea         String?
+  demandDescription       String?  @db.Text
+  urgency                 String?  // 'baixa' | 'media' | 'alta' | 'urgente'
+  status                  String   @default("novo") // 'novo' | 'em_triagem' | 'qualificado' | 'consulta_agendada' | 'compareceu' | 'contrato_enviado' | 'contrato_assinado' | 'perdido'
+  contactPreference       String?
+  availableForHumanContact Boolean @default(true)
+  lgpdConsent             Boolean  @default(false)
+  lgpdConsentDate          DateTime?
+  scheduledContact         DateTime?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  conversations           Conversation[]
+  pipelineHistory         PipelineHistory[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([legalArea])
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  tenantId      String
+  leadId        String
+  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  channel       String   // 'whatsapp' | 'chat' | 'email' | 'instagram'
+  assignedType  String   @default("ai") // 'ai' | 'human' | 'hybrid'
+  status        String   @default("active") // 'active' | 'paused' | 'closed'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  messages      Message[]
+
+  @@index([tenantId])
+  @@index([leadId])
+}
+
+model Message {
+  id            String   @id @default(uuid())
+  conversationId String
+  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  content       String   @db.Text
+  senderType    String   // 'lead' | 'sdr' | 'ai'
+  createdAt     DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model PipelineStage {
+  id          String   @id @default(uuid())
+  tenantId   String
+  name        String
+  order       Int
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
+}
+
+model PipelineHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  stageName   String
+  changedBy   String?  // userId
+  notes       String?   @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([leadId])
+}
