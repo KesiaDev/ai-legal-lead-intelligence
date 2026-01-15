@@ -184,6 +184,10 @@ async function build() {
 // Iniciar servidor
 async function start() {
   try {
+    // Testar conexão com banco
+    await prisma.$connect();
+    console.log('✅ Database connected');
+
     const app = await build();
     const PORT = Number(process.env.PORT) || env.PORT;
     
@@ -194,11 +198,20 @@ async function start() {
 
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Environment: ${env.NODE_ENV}`);
-  } catch (err) {
+    console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
+  } catch (err: any) {
+    console.error('❌ Failed to start server:', err);
     fastify.log.error(err);
+    await prisma.$disconnect();
     process.exit(1);
   }
 }
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  await prisma.$disconnect();
+  process.exit(0);
+});
 
 // Executar
 if (require.main === module) {
