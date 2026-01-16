@@ -232,6 +232,41 @@ async function build() {
     return { user };
   });
 
+  // Rota POST /leads para webhook do Make
+  fastify.post('/leads', async (request: any, reply: any) => {
+    try {
+      // Log do body para debug (aparece nos logs do Railway)
+      fastify.log.info({ body: request.body }, 'POST /leads - Webhook Make');
+      console.log('POST /leads received:', JSON.stringify(request.body, null, 2));
+      
+      const body = request.body as any;
+      
+      // Validação básica do body
+      if (!body || typeof body !== 'object') {
+        return reply.status(400).send({ 
+          error: 'Invalid request body',
+          message: 'Body must be a valid JSON object'
+        });
+      }
+
+      // Extrair campos (nome, telefone, origem)
+      const { nome, telefone, origem } = body;
+
+      // Retornar sucesso (sem validações complexas)
+      return reply.status(200).send({ 
+        success: true 
+      });
+      
+    } catch (error: any) {
+      fastify.log.error('POST /leads error:', error);
+      console.error('POST /leads error:', error);
+      return reply.status(500).send({ 
+        error: 'Failed to process lead',
+        message: error.message || 'Internal server error'
+      });
+    }
+  });
+
   // Registrar rota de intake de leads (isolada)
   await registerIntakeRoute(fastify);
   
