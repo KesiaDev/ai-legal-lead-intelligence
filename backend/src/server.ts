@@ -10,6 +10,24 @@ import prisma from './config/database';
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 
+// ======================================================
+// TIPOS
+// ======================================================
+interface RegisterBody {
+  email?: string;
+  name?: string;
+  password?: string;
+  tenantName?: string;
+}
+
+interface LeadWebhookBody {
+  nome?: string;
+  telefone?: string;
+  email?: string | null;
+  origem?: string | null;
+  [key: string]: unknown;
+}
+
 const fastify = Fastify({
   logger: true,
 });
@@ -34,6 +52,103 @@ async function getOrCreateDefaultTenant(): Promise<string> {
   }
 
   return tenant.id;
+}
+
+// ======================================================
+// UTIL – NORMALIZAÇÃO E ENRIQUECIMENTO (FASE 2)
+// ======================================================
+
+/**
+ * Normaliza telefone para formato +55XXXXXXXXXXX
+ * Remove tudo que não for número
+ * Lança erro se inválido
+ */
+function normalizePhone(phone: string): string {
+  if (!phone || typeof phone !== 'string') {
+    throw new Error('Telefone inválido: campo obrigatório');
+  }
+
+  // Remove tudo que não for número
+  const digits = phone.replace(/\D/g, '');
+
+  if (digits.length < 10 || digits.length > 13) {
+    throw new Error(`Telefone inválido: deve ter entre 10 e 13 dígitos (recebido: ${digits.length})`);
+  }
+
+  // Se começa com 55 (Brasil), mantém
+  // Se não, adiciona 55
+  let normalized = digits;
+  if (!digits.startsWith('55')) {
+    normalized = `55${digits}`;
+  }
+
+  // Garante formato +55XXXXXXXXXXX
+  return `+${normalized}`;
+}
+
+/**
+ * Normaliza nome: trim, remove espaços duplicados, capitaliza palavras
+ */
+function normalizeName(name: string): string {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Nome inválido: campo obrigatório');
+  }
+
+  // Trim e remove espaços duplicados
+  let normalized = name.trim().replace(/\s+/g, ' ');
+
+  // Capitaliza palavras (primeira letra maiúscula, resto minúscula)
+  normalized = normalized
+    .split(' ')
+    .map((word) => {
+      if (word.length === 0) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+
+  return normalized;
+}
+
+/**
+ * Normaliza email: se não existir retorna null, se existir lowercase + trim
+ */
+function normalizeEmail(email: string | null | undefined): string | null {
+  if (!email || typeof email !== 'string') {
+    return null;
+  }
+
+  const trimmed = email.trim().toLowerCase();
+
+  // Validação básica de email
+  if (trimmed.length === 0 || !trimmed.includes('@')) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Detecta canal baseado na origem
+ * Mapeia: make → automacao, whatsapp → whatsapp, site → inbound, indicacao → referral, default → outros
+ */
+function detectChannel(origem: string | null | undefined): string {
+  if (!origem || typeof origem !== 'string') {
+    return 'outros';
+  }
+
+  const origemLower = origem.toLowerCase().trim();
+
+  const mapping: Record<string, string> = {
+    make: 'automacao',
+    whatsapp: 'whatsapp',
+    site: 'inbound',
+    indicacao: 'referral',
+    referral: 'referral',
+    inbound: 'inbound',
+    automacao: 'automacao',
+  };
+
+  return mapping[origemLower] || 'outros';
 }
 
 // ======================================================
@@ -65,7 +180,7 @@ async function build() {
   // AUTH
   // ======================================================
   fastify.post('/register', async (request, reply) => {
-    const { email, name, password, tenantName } = request.body as any;
+    const { email, name, password, tenantName } = request.body as RegisterBody;
 
     if (!email || !name || !password || !tenantName) {
       return reply.status(400).send({ error: 'Campos obrigatórios ausentes' });
@@ -102,10 +217,11 @@ async function build() {
 
   // ======================================================
   // 🔥 WEBHOOK UNIVERSAL /leads (À PROVA DE MAKE)
+  // FASE 2: Normalização e Enriquecimento
   // ======================================================
   fastify.post('/leads', async (request, reply) => {
     try {
-      const body = request.body as any;
+      const body = request.body as LeadWebhookBody;
 
       if (!body) {
         return reply.status(400).send({ error: 'Body vazio' });
@@ -113,18 +229,47 @@ async function build() {
 
       const { nome, telefone, email, origem } = body;
 
+      // Validação básica (antes da normalização)
       if (!nome || !telefone) {
         return reply.status(400).send({
           error: 'nome e telefone são obrigatórios',
         });
       }
 
+      // ============================================
+      // FASE 2: NORMALIZAÇÃO E ENRIQUECIMENTO
+      // ============================================
+      let normalizedPhone: string;
+      let normalizedName: string;
+      let normalizedEmail: string | null;
+      let canal: string;
+
+      try {
+        normalizedPhone = normalizePhone(telefone);
+        normalizedName = normalizeName(nome);
+        normalizedEmail = normalizeEmail(email);
+        canal = detectChannel(origem);
+      } catch (normalizeError: unknown) {
+        const errorMessage = normalizeError instanceof Error ? normalizeError.message : 'Erro desconhecido na normalização';
+        return reply.status(400).send({
+          error: 'Erro na normalização dos dados',
+          message: errorMessage,
+        });
+      }
+
+      // ============================================
+      // DEDUPLICAÇÃO (usando dados normalizados)
+      // ============================================
       const tenantId = await getOrCreateDefaultTenant();
 
+      // Busca por telefone normalizado OU email (se fornecido)
       const existing = await prisma.lead.findFirst({
         where: {
           tenantId,
-          phone: telefone,
+          OR: [
+            { phone: normalizedPhone },
+            ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+          ],
         },
       });
 
@@ -136,14 +281,23 @@ async function build() {
         });
       }
 
+      // ============================================
+      // SALVAR PAYLOAD ORIGINAL E METADADOS
+      // ============================================
+      // Armazena payload original como JSON string em demandDescription
+      // e origem/canal em legalArea/contactPreference
+      const payloadOriginal = JSON.stringify(body);
+
       const lead = await prisma.lead.create({
         data: {
           tenantId,
-          name: nome,
-          phone: telefone,
-          email: email ?? null,
+          name: normalizedName,
+          phone: normalizedPhone,
+          email: normalizedEmail,
           status: 'novo',
-          legalArea: origem ?? null,
+          legalArea: origem ?? null, // Origem original
+          contactPreference: canal, // Canal detectado
+          demandDescription: payloadOriginal, // Payload original completo
         },
       });
 
@@ -152,10 +306,12 @@ async function build() {
         leadId: lead.id,
         message: 'Lead criado com sucesso',
       });
-    } catch (err) {
+    } catch (err: unknown) {
       fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
       return reply.status(500).send({
         error: 'Erro interno no webhook',
+        message: errorMessage,
       });
     }
   });
