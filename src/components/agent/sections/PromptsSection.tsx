@@ -59,6 +59,15 @@ const PROMPT_TYPES = {
   'Scheduler': 'Agendamento',
   'Insights': 'Insights',
   'Lembrete': 'Lembrete de Reunião',
+  'classificador_area': 'Classificador de Área Jurídica',
+  'avaliador_urgencia': 'Avaliador de Urgência Jurídica',
+  'pre_diagnostico': 'Pré-Diagnóstico Jurídico',
+  'qualificacao_comercial': 'Qualificação Comercial Jurídica',
+  'encaminhamento': 'Agente de Encaminhamento',
+  'proposta_acao': 'Proposta de Próxima Ação',
+  'compliance_oab': 'Compliance OAB',
+  'inteligencia_funil': 'Inteligência do Funil',
+  'acompanhamento': 'Acompanhamento Jurídico Inteligente',
 };
 
 export function PromptsSection() {
