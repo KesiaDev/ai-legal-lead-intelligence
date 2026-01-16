@@ -4,8 +4,10 @@ import formbody from '@fastify/formbody';
 import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
 import bcrypt from 'bcryptjs';
+
 import { env } from './config/env';
 import prisma from './config/database';
+
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 
@@ -15,12 +17,15 @@ const fastify = Fastify({
   },
 });
 
-// Registrar plugins
+// ===============================
+// BUILD APP
+// ===============================
 async function build() {
-  // FormBody - parser de JSON e form-data (OBRIGATÓRIO para POST em produção)
+  // -------------------------------
+  // BODY PARSERS
+  // -------------------------------
   await fastify.register(formbody);
 
-  // Parser explícito de JSON (garantia extra)
   fastify.addContentTypeParser(
     'application/json',
     { parseAs: 'string' },
@@ -34,11 +39,13 @@ async function build() {
     }
   );
 
-  // CORS - suporta múltiplas origens com callback (melhor para produção)
-  const allowedOrigins = env.CORS_ORIGIN.split(',').map(origin => origin.trim());
+  // -------------------------------
+  // CORS
+  // -------------------------------
+  const allowedOrigins = env.CORS_ORIGIN.split(',').map(o => o.trim());
+
   await fastify.register(cors, {
     origin: (origin, cb) => {
-      // Permitir requisições sem origin (mobile apps, Postman, etc)
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) {
         cb(null, true);
@@ -49,7 +56,9 @@ async function build() {
     credentials: true,
   });
 
+  // -------------------------------
   // JWT
+  // -------------------------------
   await fastify.register(jwt, {
     secret: env.JWT_SECRET,
     sign: {
@@ -57,79 +66,65 @@ async function build() {
     },
   });
 
-  // WebSocket
+  // -------------------------------
+  // WEBSOCKET
+  // -------------------------------
   await fastify.register(websocket);
 
-  // Rota raiz
+  // ===============================
+  // ROTAS BASE
+  // ===============================
   fastify.get('/', async () => {
     return {
       message: 'SDR Jurídico API',
-      version: '1.0.0',
       status: 'online',
+      version: '1.0.0',
       timestamp: new Date().toISOString(),
-      endpoints: {
-        health: '/health',
-        auth: '/register, /login, /me',
-        leads: '/leads',
-        conversations: '/conversations',
-        pipeline: '/pipeline/stages',
-      },
     };
   });
 
-  // Health check
   fastify.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
-  // Rotas de autenticação
+  // ===============================
+  // AUTH
+  // ===============================
   fastify.post('/register', async (request: any, reply: any) => {
     try {
-      // Log do body para debug
-      fastify.log.info({ body: request.body, headers: request.headers }, 'REGISTER REQUEST');
-      
-      const body = request.body as any;
-      
-      // Validação explícita do body
-      if (!body || typeof body !== 'object') {
-        fastify.log.warn({ body }, 'Invalid body in register');
-        return reply.status(400).send({ error: 'Invalid request body' });
-      }
+      const { email, name, password, tenantName } = request.body as any;
 
-      const { email, name, password, tenantName } = body;
-      
       if (!email || !name || !password || !tenantName) {
-        return reply.status(400).send({ 
-          error: 'Missing required fields',
-          required: ['email', 'name', 'password', 'tenantName']
+        return reply.status(400).send({
+          error: 'Campos obrigatórios ausentes',
         });
       }
 
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        return reply.status(400).send({ error: 'Email already registered' });
+      const exists = await prisma.user.findUnique({ where: { email } });
+      if (exists) {
+        return reply.status(400).send({ error: 'Email já cadastrado' });
       }
 
       const tenant = await prisma.tenant.create({
         data: { name: tenantName },
       });
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashed = await bcrypt.hash(password, 10);
 
       const user = await prisma.user.create({
         data: {
-          tenantId: tenant.id,
           email,
           name,
-          password: hashedPassword,
+          password: hashed,
           role: 'admin',
+          tenantId: tenant.id,
         },
       });
 
-      const token = fastify.jwt.sign({ id: user.id, tenantId: tenant.id });
+      const token = fastify.jwt.sign({
+        id: user.id,
+        tenantId: tenant.id,
+      });
 
       return {
         token,
@@ -139,40 +134,20 @@ async function build() {
           name: user.name,
           role: user.role,
         },
-        tenant: {
-          id: tenant.id,
-          name: tenant.name,
-        },
+        tenant,
       };
-    } catch (error: any) {
-      fastify.log.error('Register error:', error);
-      return reply.status(500).send({ 
-        error: 'Failed to register',
-        message: error.message || 'Internal server error'
-      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro no registro' });
     }
   });
 
   fastify.post('/login', async (request: any, reply: any) => {
     try {
-      // Log do body para debug
-      fastify.log.info({ body: request.body, headers: request.headers }, 'LOGIN REQUEST');
-      
-      const body = request.body as any;
-      
-      // Validação explícita do body
-      if (!body || typeof body !== 'object') {
-        fastify.log.warn({ body }, 'Invalid body in login');
-        return reply.status(400).send({ error: 'Invalid request body' });
-      }
-
-      const { email, password } = body;
+      const { email, password } = request.body as any;
 
       if (!email || !password) {
-        return reply.status(400).send({ 
-          error: 'Email and password required',
-          received: { hasEmail: !!email, hasPassword: !!password }
-        });
+        return reply.status(400).send({ error: 'Credenciais inválidas' });
       }
 
       const user = await prisma.user.findUnique({
@@ -181,16 +156,18 @@ async function build() {
       });
 
       if (!user) {
-        return reply.status(401).send({ error: 'Invalid credentials' });
+        return reply.status(401).send({ error: 'Credenciais inválidas' });
       }
 
       const valid = await bcrypt.compare(password, user.password);
-
       if (!valid) {
-        return reply.status(401).send({ error: 'Invalid credentials' });
+        return reply.status(401).send({ error: 'Credenciais inválidas' });
       }
 
-      const token = fastify.jwt.sign({ id: user.id, tenantId: user.tenantId });
+      const token = fastify.jwt.sign({
+        id: user.id,
+        tenantId: user.tenantId,
+      });
 
       return {
         token,
@@ -200,117 +177,128 @@ async function build() {
           name: user.name,
           role: user.role,
         },
-        tenant: {
-          id: user.tenant.id,
-          name: user.tenant.name,
-        },
+        tenant: user.tenant,
       };
-    } catch (error: any) {
-      fastify.log.error('Login error:', error);
-      return reply.status(500).send({ 
-        error: 'Failed to login',
-        message: error.message || 'Internal server error'
-      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Erro no login' });
     }
   });
 
-  fastify.get('/me', {
-    preHandler: [async (request: any, reply: any) => {
-      try {
-        await request.jwtVerify();
-      } catch (err) {
-        reply.status(401).send({ error: 'Unauthorized' });
-      }
-    }],
-  }, async (request: any) => {
-    const userId = (request.user as any)?.id;
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { tenant: true },
-    });
+  fastify.get(
+    '/me',
+    {
+      preHandler: async (request: any, reply: any) => {
+        try {
+          await request.jwtVerify();
+        } catch {
+          return reply.status(401).send({ error: 'Unauthorized' });
+        }
+      },
+    },
+    async (request: any) => {
+      const userId = request.user.id;
 
-    return { user };
-  });
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { tenant: true },
+      });
 
-  // Rota POST /leads para webhook do Make
+      return { user };
+    }
+  );
+
+  // ===============================
+  // LEADS (WEBHOOK UNIVERSAL)
+  // ===============================
   fastify.post('/leads', async (request: any, reply: any) => {
     try {
-      // Log do body para debug (aparece nos logs do Railway)
-      fastify.log.info({ body: request.body }, 'POST /leads - Webhook Make');
-      console.log('POST /leads received:', JSON.stringify(request.body, null, 2));
-      
-      const body = request.body as any;
-      
-      // Validação básica do body
-      if (!body || typeof body !== 'object') {
-        return reply.status(400).send({ 
-          error: 'Invalid request body',
-          message: 'Body must be a valid JSON object'
+      const { nome, telefone, email } = request.body as any;
+
+      if (!nome || !telefone) {
+        return reply.status(400).send({
+          error: 'nome e telefone são obrigatórios',
         });
       }
 
-      // Extrair campos (nome, telefone, origem)
-      const { nome, telefone, origem } = body;
+      const TENANT_ID = 'default-tenant';
 
-      // Retornar sucesso (sem validações complexas)
-      return reply.status(200).send({ 
-        success: true 
+      const existing = await prisma.lead.findFirst({
+        where: {
+          tenantId: TENANT_ID,
+          phone: telefone,
+        },
       });
-      
-    } catch (error: any) {
-      fastify.log.error('POST /leads error:', error);
-      console.error('POST /leads error:', error);
-      return reply.status(500).send({ 
-        error: 'Failed to process lead',
-        message: error.message || 'Internal server error'
+
+      if (existing) {
+        return reply.send({
+          success: true,
+          leadId: existing.id,
+          message: 'Lead já existente',
+        });
+      }
+
+      const lead = await prisma.lead.create({
+        data: {
+          tenantId: TENANT_ID,
+          name: nome,
+          phone: telefone,
+          email: email || null,
+          status: 'novo',
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        leadId: lead.id,
+        message: 'Lead criado com sucesso',
+      });
+    } catch (err: any) {
+      fastify.log.error(err);
+      return reply.status(500).send({
+        error: 'Erro interno',
       });
     }
   });
 
-  // Registrar rota de intake de leads (isolada)
+  // ===============================
+  // ROTAS DE AGENTE IA
+  // ===============================
   await registerIntakeRoute(fastify);
-  
-  // Registrar rota de conversação com agente IA (conversacional)
   await registerConversationRoute(fastify);
 
   return fastify;
 }
 
-// Iniciar servidor
+// ===============================
+// START SERVER
+// ===============================
 async function start() {
   try {
-    // Testar conexão com banco
     await prisma.$connect();
     console.log('✅ Database connected');
 
     const app = await build();
-    // Railway fornece PORT via process.env, priorizar isso
     const PORT = Number(process.env.PORT) || Number(env.PORT) || 3001;
-    
+
     await app.listen({
       port: PORT,
       host: '0.0.0.0',
     });
 
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📊 Environment: ${env.NODE_ENV}`);
-    console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
-    console.log(`🔌 Process PORT: ${process.env.PORT || 'not set'}`);
-  } catch (err: any) {
-    console.error('❌ Failed to start server:', err);
-    fastify.log.error(err);
+  } catch (err) {
+    console.error('❌ Failed to start server', err);
     await prisma.$disconnect();
     process.exit(1);
   }
 }
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   await prisma.$disconnect();
   process.exit(0);
 });
 
-// Executar
 if (require.main === module) {
   start();
 }
