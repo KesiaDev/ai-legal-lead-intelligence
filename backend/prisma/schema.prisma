@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Prisma schema for Super SDR Jurídico (SaaS Multi-Tenant)
+// Compatible with Fastify + Railway + PostgreSQL
 
 generator client {
   provider = "prisma-client-js"
@@ -10,20 +10,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("user")
-  isActive  Boolean  @default(true)
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
-}
+////////////////////
+// CORE – TENANT  //
+////////////////////
 
 model Tenant {
   id        String   @id @default(uuid())
@@ -34,46 +23,95 @@ model Tenant {
 
   users     User[]
   leads     Lead[]
+  pipelines PipelineStage[]
+
+  @@index([plan])
 }
 
-model Lead {
-  id                      String   @id @default(uuid())
-  tenantId                String
-  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name                    String
-  phone                   String
-  email                   String?
-  city                    String?
-  state                   String?
-  legalArea               String?
-  customLegalArea         String?
-  demandDescription       String?  @db.Text
-  urgency                 String?  // 'baixa' | 'media' | 'alta' | 'urgente'
-  status                  String   @default("novo") // 'novo' | 'em_triagem' | 'qualificado' | 'consulta_agendada' | 'compareceu' | 'contrato_enviado' | 'contrato_assinado' | 'perdido'
-  contactPreference       String?
-  availableForHumanContact Boolean @default(true)
-  lgpdConsent             Boolean  @default(false)
-  lgpdConsentDate          DateTime?
-  scheduledContact         DateTime?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+////////////////////
+// USERS          //
+////////////////////
 
-  conversations           Conversation[]
-  pipelineHistory         PipelineHistory[]
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("user") // admin | user | sdr
+  isActive  Boolean  @default(true)
+
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([role])
+}
+
+////////////////////
+// LEADS (CORE)   //
+////////////////////
+
+model Lead {
+  id                        String   @id @default(uuid())
+
+  tenantId                  String
+  tenant                    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name                      String
+  phone                     String
+  email                     String?
+
+  city                      String?
+  state                     String?
+
+  legalArea                 String?
+  customLegalArea           String?
+  demandDescription         String?  @db.Text
+
+  urgency                   String?  // baixa | media | alta | urgente
+
+  status                    String   @default("novo")
+  // novo | em_triagem | qualificado | consulta_agendada | compareceu
+  // contrato_enviado | contrato_assinado | perdido
+
+  contactPreference         String?
+  availableForHumanContact  Boolean  @default(true)
+
+  lgpdConsent               Boolean  @default(false)
+  lgpdConsentDate           DateTime?
+
+  scheduledContact          DateTime?
+
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  conversations             Conversation[]
+  pipelineHistory           PipelineHistory[]
 
   @@index([tenantId])
   @@index([status])
   @@index([legalArea])
 }
 
+////////////////////
+// CONVERSATIONS  //
+////////////////////
+
 model Conversation {
   id            String   @id @default(uuid())
+
   tenantId      String
+
   leadId        String
   lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  channel       String   // 'whatsapp' | 'chat' | 'email' | 'instagram'
-  assignedType  String   @default("ai") // 'ai' | 'human' | 'hybrid'
-  status        String   @default("active") // 'active' | 'paused' | 'closed'
+
+  channel       String   // whatsapp | chat | email | instagram
+  assignedType  String   @default("ai") // ai | human | hybrid
+  status        String   @default("active") // active | paused | closed
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -81,42 +119,64 @@ model Conversation {
 
   @@index([tenantId])
   @@index([leadId])
+  @@index([channel])
 }
+
+////////////////////
+// MESSAGES       //
+////////////////////
 
 model Message {
-  id            String   @id @default(uuid())
+  id             String   @id @default(uuid())
+
   conversationId String
-  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  content       String   @db.Text
-  senderType    String   // 'lead' | 'sdr' | 'ai'
-  createdAt     DateTime @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  content        String   @db.Text
+  senderType     String   // lead | sdr | ai
+
+  createdAt      DateTime @default(now())
 
   @@index([conversationId])
+  @@index([senderType])
 }
 
-model PipelineStage {
-  id          String   @id @default(uuid())
-  tenantId   String
-  name        String
-  order       Int
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+////////////////////
+// PIPELINE       //
+////////////////////
 
-  @@index([tenantId])
+model PipelineStage {
+  id        String   @id @default(uuid())
+
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name      String
+  order     Int
+  color     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model PipelineHistory {
-  id          String   @id @default(uuid())
-  tenantId    String
-  leadId      String
-  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  stageName   String
-  changedBy   String?  // userId
-  notes       String?   @db.Text
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+
+  tenantId  String
+
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  stageName String
+  changedBy String?  // userId ou 'ai'
+  notes     String?  @db.Text
+
+  createdAt DateTime @default(now())
 
   @@index([tenantId])
   @@index([leadId])
 }
+
