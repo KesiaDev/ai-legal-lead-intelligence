@@ -9,6 +9,7 @@ import prisma from './config/database';
 
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
+import { classifyLead } from './services/leadClassifier';
 
 // ======================================================
 // TIPOS
@@ -273,11 +274,35 @@ async function build() {
         },
       });
 
+      // ============================================
+      // FASE 3: CLASSIFICAÇÃO INTELIGENTE
+      // ============================================
+      let classification;
+      try {
+        classification = await classifyLead({
+          nome: normalizedName,
+          telefone: normalizedPhone,
+          email: normalizedEmail || undefined,
+          origem: origem || undefined,
+        });
+        fastify.log.info(
+          { classification, normalizedName, normalizedPhone },
+          'Lead classified'
+        );
+      } catch (classificationError: unknown) {
+        fastify.log.warn(
+          { error: classificationError },
+          'Classification failed, continuing without classification'
+        );
+        // Continua sem classificação (não quebra o endpoint)
+      }
+
       if (existing) {
         return reply.send({
           success: true,
           leadId: existing.id,
           message: 'Lead já existente',
+          ...(classification && { classification }),
         });
       }
 
@@ -305,6 +330,7 @@ async function build() {
         success: true,
         leadId: lead.id,
         message: 'Lead criado com sucesso',
+        ...(classification && { classification }),
       });
     } catch (err: unknown) {
       fastify.log.error(err);
