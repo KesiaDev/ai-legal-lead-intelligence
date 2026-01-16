@@ -211,56 +211,68 @@ async function build() {
   // ===============================
   // LEADS (WEBHOOK UNIVERSAL)
   // ===============================
-  fastify.post('/leads', async (request: any, reply: any) => {
-    try {
-      const { nome, telefone, email } = request.body as any;
-
-      if (!nome || !telefone) {
-        return reply.status(400).send({
-          error: 'nome e telefone são obrigatórios',
+  fastify.post(
+    '/leads',
+    async (
+      request: {
+        body: {
+          nome?: string;
+          telefone?: string;
+          email?: string;
+        };
+      },
+      reply: any
+    ) => {
+      try {
+        const { nome, telefone, email } = request.body;
+  
+        // Validação básica
+        if (!nome || !telefone) {
+          return reply.status(400).send({
+            error: 'nome e telefone são obrigatórios',
+          });
+        }
+  
+        const TENANT_ID = 'default-tenant';
+  
+        const existing = await prisma.lead.findFirst({
+          where: {
+            tenantId: TENANT_ID,
+            phone: telefone,
+          },
         });
-      }
-
-      const TENANT_ID = 'default-tenant';
-
-      const existing = await prisma.lead.findFirst({
-        where: {
-          tenantId: TENANT_ID,
-          phone: telefone,
-        },
-      });
-
-      if (existing) {
-        return reply.send({
+  
+        if (existing) {
+          return reply.send({
+            success: true,
+            leadId: existing.id,
+            message: 'Lead já existente',
+          });
+        }
+  
+        const lead = await prisma.lead.create({
+          data: {
+            tenantId: TENANT_ID,
+            name: nome,
+            phone: telefone,
+            email: email ?? null,
+            status: 'novo',
+          },
+        });
+  
+        return reply.status(201).send({
           success: true,
-          leadId: existing.id,
-          message: 'Lead já existente',
+          leadId: lead.id,
+          message: 'Lead criado com sucesso',
+        });
+      } catch (err: any) {
+        fastify.log.error(err);
+        return reply.status(500).send({
+          error: 'Erro interno',
         });
       }
-
-      const lead = await prisma.lead.create({
-        data: {
-          tenantId: TENANT_ID,
-          name: nome,
-          phone: telefone,
-          email: email || null,
-          status: 'novo',
-        },
-      });
-
-      return reply.status(201).send({
-        success: true,
-        leadId: lead.id,
-        message: 'Lead criado com sucesso',
-      });
-    } catch (err: any) {
-      fastify.log.error(err);
-      return reply.status(500).send({
-        error: 'Erro interno',
-      });
     }
-  });
-
+  );
   // ===============================
   // ROTAS DE AGENTE IA
   // ===============================
