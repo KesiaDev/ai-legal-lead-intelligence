@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { env } from './config/env';
 import prisma from './config/database';
 import { registerIntakeRoute } from './api/agent/intake';
+import { registerConversationRoute } from './api/agent/conversation';
 
 const fastify = Fastify({
   logger: {
@@ -233,6 +234,9 @@ async function build() {
 
   // Registrar rota de intake de leads (isolada)
   await registerIntakeRoute(fastify);
+  
+  // Registrar rota de conversação com agente IA (conversacional)
+  await registerConversationRoute(fastify);
 
   return fastify;
 }
