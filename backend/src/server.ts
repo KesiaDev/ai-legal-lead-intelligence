@@ -10,6 +10,7 @@ import prisma from './config/database';
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 import { classifyLead } from './services/leadClassifier';
+import { routeLead } from './services/leadRouter';
 
 // ======================================================
 // TIPOS
@@ -297,12 +298,42 @@ async function build() {
         // Continua sem classificação (não quebra o endpoint)
       }
 
+      // ============================================
+      // ROTEAMENTO INTELIGENTE
+      // ============================================
+      let routing;
+      if (classification) {
+        try {
+          routing = routeLead(classification);
+          fastify.log.info(
+            { destino: routing.destino, urgencia: routing.urgencia },
+            `Lead roteado para: ${routing.destino}`
+          );
+          fastify.log.info(
+            { urgencia: routing.urgencia },
+            `Urgência definida: ${routing.urgencia}`
+          );
+        } catch (routingError: unknown) {
+          fastify.log.warn(
+            { error: routingError },
+            'Routing failed, using fallback'
+          );
+          // Fallback seguro
+          routing = {
+            destino: 'nutricao' as const,
+            urgencia: 'sem_pressa' as const,
+            descricao: 'Lead direcionado para nutrição (fallback seguro)',
+          };
+        }
+      }
+
       if (existing) {
         return reply.send({
           success: true,
           leadId: existing.id,
           message: 'Lead já existente',
           ...(classification && { classification }),
+          ...(routing && { routing }),
         });
       }
 
@@ -331,6 +362,7 @@ async function build() {
         leadId: lead.id,
         message: 'Lead criado com sucesso',
         ...(classification && { classification }),
+        ...(routing && { routing }),
       });
     } catch (err: unknown) {
       fastify.log.error(err);
