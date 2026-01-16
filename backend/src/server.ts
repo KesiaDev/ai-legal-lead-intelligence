@@ -18,6 +18,33 @@ const fastify = Fastify({
 });
 
 // ===============================
+// UTILITÁRIOS
+// ===============================
+
+/**
+ * Obtém ou cria o Tenant padrão do sistema
+ * Garante que sempre existe um tenant válido para webhooks e leads externos
+ */
+async function getOrCreateDefaultTenant(): Promise<string> {
+  const DEFAULT_TENANT_NAME = 'Tenant Padrão SDR';
+
+  let tenant = await prisma.tenant.findFirst({
+    where: { name: DEFAULT_TENANT_NAME },
+  });
+
+  if (!tenant) {
+    tenant = await prisma.tenant.create({
+      data: {
+        name: DEFAULT_TENANT_NAME,
+        plan: 'free',
+      },
+    });
+  }
+
+  return tenant.id;
+}
+
+// ===============================
 // BUILD APP
 // ===============================
 async function build() {
@@ -211,18 +238,7 @@ async function build() {
   // ===============================
   // LEADS (WEBHOOK UNIVERSAL)
   // ===============================
-  fastify.post(
-    '/leads',
-    async (
-      request: {
-        body: {
-          nome?: string;
-          telefone?: string;
-          email?: string;
-        };
-      },
-      reply: any
-    ) => {
+  fastify.post('/leads', async (request: any, reply: any) => {
       try {
         const { nome, telefone, email } = request.body;
   
@@ -233,11 +249,13 @@ async function build() {
           });
         }
   
-        const TENANT_ID = 'default-tenant';
+        // Obtém ou cria tenant padrão
+        const tenantId = await getOrCreateDefaultTenant();
   
+        // Verifica se lead já existe (idempotência)
         const existing = await prisma.lead.findFirst({
           where: {
-            tenantId: TENANT_ID,
+            tenantId,
             phone: telefone,
           },
         });
@@ -250,9 +268,10 @@ async function build() {
           });
         }
   
+        // Cria novo lead
         const lead = await prisma.lead.create({
           data: {
-            tenantId: TENANT_ID,
+            tenantId,
             name: nome,
             phone: telefone,
             email: email ?? null,
