@@ -13,7 +13,7 @@ interface Classification {
 
 interface RoutingResult {
   destino: 'whatsapp_humano' | 'sdr_ia' | 'nutricao';
-  urgencia: 'imediata' | 'curto_prazo' | 'sem_pressa';
+  urgencia: 'imediata' | 'alta' | 'normal';
   descricao: string;
 }
 
@@ -22,8 +22,8 @@ interface RoutingResult {
  * 
  * Regras:
  * - lead_quente → whatsapp_humano, imediata
- * - lead_morno → sdr_ia, curto_prazo
- * - lead_frio → nutricao, sem_pressa
+ * - lead_morno → sdr_ia, alta
+ * - lead_frio → nutricao, normal
  */
 export function routeLead(classification: Classification): RoutingResult {
   switch (classification.classificacao) {
@@ -37,14 +37,14 @@ export function routeLead(classification: Classification): RoutingResult {
     case 'lead_morno':
       return {
         destino: 'sdr_ia',
-        urgencia: 'curto_prazo',
+        urgencia: 'alta',
         descricao: 'Lead morno direcionado para SDR IA para qualificação',
       };
 
     case 'lead_frio':
       return {
         destino: 'nutricao',
-        urgencia: 'sem_pressa',
+        urgencia: 'normal',
         descricao: 'Lead frio direcionado para nutrição de conteúdo',
       };
 
@@ -52,8 +52,20 @@ export function routeLead(classification: Classification): RoutingResult {
       // Fallback seguro (nunca deve chegar aqui, mas garante segurança)
       return {
         destino: 'nutricao',
-        urgencia: 'sem_pressa',
+        urgencia: 'normal',
         descricao: 'Lead direcionado para nutrição (fallback)',
       };
   }
+}
+
+/**
+ * Retorna routing padrão (fallback seguro)
+ * Usado quando classificação não está disponível ou falha
+ */
+export function getDefaultRouting(): RoutingResult {
+  return {
+    destino: 'nutricao',
+    urgencia: 'normal',
+    descricao: 'Lead direcionado para nutrição (fallback padrão)',
+  };
 }

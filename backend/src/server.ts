@@ -10,7 +10,7 @@ import prisma from './config/database';
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 import { classifyLead } from './services/leadClassifier';
-import { routeLead } from './services/leadRouter';
+import { routeLead, getDefaultRouting } from './services/leadRouter';
 
 // ======================================================
 // TIPOS
@@ -27,6 +27,7 @@ interface LeadWebhookBody {
   telefone?: string;
   email?: string | null;
   origem?: string | null;
+  clienteId?: string; // ID do cliente/escritório (para filtro no Make)
   [key: string]: unknown;
 }
 
@@ -48,6 +49,34 @@ async function getOrCreateDefaultTenant(): Promise<string> {
     tenant = await prisma.tenant.create({
       data: {
         name: NAME,
+        plan: 'free',
+      },
+    });
+  }
+
+  return tenant.id;
+}
+
+/**
+ * Busca ou cria tenant baseado no clienteId
+ * Se clienteId não for fornecido, usa tenant padrão
+ */
+async function getOrCreateTenantByClienteId(clienteId?: string): Promise<string> {
+  if (!clienteId) {
+    return getOrCreateDefaultTenant();
+  }
+
+  // Busca tenant pelo clienteId (usando o ID do tenant como clienteId)
+  let tenant = await prisma.tenant.findUnique({
+    where: { id: clienteId },
+  });
+
+  if (!tenant) {
+    // Se não existir, cria um novo tenant com o clienteId
+    tenant = await prisma.tenant.create({
+      data: {
+        id: clienteId, // Usa clienteId como ID do tenant
+        name: `Cliente ${clienteId}`,
         plan: 'free',
       },
     });
@@ -229,7 +258,7 @@ async function build() {
         return reply.status(400).send({ error: 'Body vazio' });
       }
 
-      const { nome, telefone, email, origem } = body;
+      const { nome, telefone, email, origem, clienteId } = body;
 
       // Validação básica (antes da normalização)
       if (!nome || !telefone) {
@@ -262,7 +291,8 @@ async function build() {
       // ============================================
       // DEDUPLICAÇÃO (usando dados normalizados)
       // ============================================
-      const tenantId = await getOrCreateDefaultTenant();
+      // Usa clienteId se fornecido, senão usa tenant padrão
+      const tenantId = await getOrCreateTenantByClienteId(clienteId);
 
       // Busca por telefone normalizado OU email (se fornecido)
       const existing = await prisma.lead.findFirst({
@@ -301,6 +331,7 @@ async function build() {
       // ============================================
       // ROTEAMENTO INTELIGENTE
       // ============================================
+      // Garantir que routing SEMPRE exista (obrigatório para Make)
       let routing;
       if (classification) {
         try {
@@ -318,22 +349,33 @@ async function build() {
             { error: routingError },
             'Routing failed, using fallback'
           );
-          // Fallback seguro
-          routing = {
-            destino: 'nutricao' as const,
-            urgencia: 'sem_pressa' as const,
-            descricao: 'Lead direcionado para nutrição (fallback seguro)',
-          };
+          // Fallback seguro com valores corretos para Make
+          routing = getDefaultRouting();
         }
+      } else {
+        // Se não há classificação, usar fallback padrão
+        routing = getDefaultRouting();
+        fastify.log.info(
+          { destino: routing.destino, urgencia: routing.urgencia },
+          `Lead roteado para: ${routing.destino} (sem classificação)`
+        );
+        fastify.log.info(
+          { urgencia: routing.urgencia },
+          `Urgência definida: ${routing.urgencia}`
+        );
       }
 
       if (existing) {
         return reply.send({
           success: true,
           leadId: existing.id,
+          clienteId: tenantId, // Retorna clienteId para filtro no Make
           message: 'Lead já existente',
           ...(classification && { classification }),
-          ...(routing && { routing }),
+          routing: {
+            destino: routing.destino,
+            urgencia: routing.urgencia,
+          },
         });
       }
 
@@ -360,9 +402,13 @@ async function build() {
       return reply.status(201).send({
         success: true,
         leadId: lead.id,
+        clienteId: tenantId, // Retorna clienteId para filtro no Make
         message: 'Lead criado com sucesso',
         ...(classification && { classification }),
-        ...(routing && { routing }),
+        routing: {
+          destino: routing.destino,
+          urgencia: routing.urgencia,
+        },
       });
     } catch (err: unknown) {
       fastify.log.error(err);
