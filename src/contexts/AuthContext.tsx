@@ -166,10 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshTenant = async () => {
     try {
-      const { api } = await import('@/api/client');
-      const response = await api.get('/tenants');
-      if (response.data && response.data.length > 0) {
-        setTenant(response.data[0]);
+      const response = await authApi.me();
+      if (response.data.tenant) {
+        setTenant(response.data.tenant);
       }
     } catch (err) {
       console.error('Erro ao atualizar dados do tenant:', err);

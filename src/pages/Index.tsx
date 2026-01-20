@@ -9,7 +9,6 @@ import { ConversationsView } from '@/components/views/ConversationsView';
 import { ScheduleView } from '@/components/schedule/ScheduleView';
 import { ExportPanel } from '@/components/export/ExportPanel';
 import { AgentConfigView } from '@/components/views/AgentConfigView';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SettingsView } from '@/components/settings/SettingsView';
 
 function AppContent() {
