@@ -7,7 +7,8 @@
   "dev": "vite",
   "build": "vite build",
   "preview": "vite preview",
-  "start": "prisma migrate deploy && prisma generate && node server.js"
+  "start": "node server.js",
+  "start:backend": "cd backend && prisma migrate deploy && prisma generate && npm start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
