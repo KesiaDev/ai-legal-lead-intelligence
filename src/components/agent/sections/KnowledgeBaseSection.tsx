@@ -429,6 +429,9 @@ export function KnowledgeBaseSection() {
               <FileText className="w-5 h-5 text-primary" />
               {viewingItem?.title}
             </DialogTitle>
+            <DialogDescription>
+              Visualize o conteúdo completo do item da base de conhecimento
+            </DialogDescription>
           </DialogHeader>
           {viewingItem && (
             <div className="space-y-4 py-4">
