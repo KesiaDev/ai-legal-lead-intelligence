@@ -11,6 +11,8 @@ import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
+import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
+import { authenticate } from './middleware/auth';
 
 // ======================================================
 // TIPOS
@@ -27,7 +29,7 @@ interface LeadWebhookBody {
   telefone?: string;
   email?: string | null;
   origem?: string | null;
-  clienteId?: string; // ID do cliente/escritório (para filtro no Make)
+  clienteId?: string; // ID do cliente/escritório (para multi-tenancy)
   [key: string]: unknown;
 }
 
@@ -36,54 +38,9 @@ const fastify = Fastify({
 });
 
 // ======================================================
-// UTIL – TENANT PADRÃO (WEBHOOKS)
+// UTIL – TENANT (importado de utils/tenant.ts)
 // ======================================================
-async function getOrCreateDefaultTenant(): Promise<string> {
-  const NAME = 'Tenant Padrão SDR';
-
-  let tenant = await prisma.tenant.findFirst({
-    where: { name: NAME },
-  });
-
-  if (!tenant) {
-    tenant = await prisma.tenant.create({
-      data: {
-        name: NAME,
-        plan: 'free',
-      },
-    });
-  }
-
-  return tenant.id;
-}
-
-/**
- * Busca ou cria tenant baseado no clienteId
- * Se clienteId não for fornecido, usa tenant padrão
- */
-async function getOrCreateTenantByClienteId(clienteId?: string): Promise<string> {
-  if (!clienteId) {
-    return getOrCreateDefaultTenant();
-  }
-
-  // Busca tenant pelo clienteId (usando o ID do tenant como clienteId)
-  let tenant = await prisma.tenant.findUnique({
-    where: { id: clienteId },
-  });
-
-  if (!tenant) {
-    // Se não existir, cria um novo tenant com o clienteId
-    tenant = await prisma.tenant.create({
-      data: {
-        id: clienteId, // Usa clienteId como ID do tenant
-        name: `Cliente ${clienteId}`,
-        plan: 'free',
-      },
-    });
-  }
-
-  return tenant.id;
-}
+// Funções movidas para utils/tenant.ts para reutilização
 
 // ======================================================
 // UTIL – NORMALIZAÇÃO E ENRIQUECIMENTO (FASE 2)
@@ -160,7 +117,7 @@ function normalizeEmail(email: string | null | undefined): string | null {
 
 /**
  * Detecta canal baseado na origem
- * Mapeia: make → automacao, whatsapp → whatsapp, site → inbound, indicacao → referral, default → outros
+ * Mapeia: n8n/make → automacao, whatsapp → whatsapp, site → inbound, indicacao → referral, default → outros
  */
 function detectChannel(origem: string | null | undefined): string {
   if (!origem || typeof origem !== 'string') {
@@ -210,6 +167,68 @@ async function build() {
   // ======================================================
   // AUTH
   // ======================================================
+  fastify.post('/login', async (request, reply) => {
+    try {
+      const { email, password } = request.body as { email?: string; password?: string };
+
+      if (!email || !password) {
+        return reply.status(400).send({ 
+          error: 'Email e senha são obrigatórios' 
+        });
+      }
+
+      const user = await prisma.user.findUnique({ 
+        where: { email },
+        include: { tenant: true },
+      });
+
+      if (!user) {
+        return reply.status(401).send({ 
+          error: 'Credenciais inválidas' 
+        });
+      }
+
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        return reply.status(401).send({ 
+          error: 'Credenciais inválidas' 
+        });
+      }
+
+      if (!user.isActive) {
+        return reply.status(403).send({ 
+          error: 'Usuário desativado' 
+        });
+      }
+
+      const token = fastify.jwt.sign({
+        id: user.id,
+        tenantId: user.tenantId,
+      });
+
+      return reply.send({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        tenant: {
+          id: user.tenant.id,
+          name: user.tenant.name,
+        },
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao fazer login',
+        message: errorMessage,
+      });
+    }
+  });
+
   fastify.post('/register', async (request, reply) => {
     const { email, name, password, tenantName } = request.body as RegisterBody;
 
@@ -247,7 +266,7 @@ async function build() {
   });
 
   // ======================================================
-  // 🔥 WEBHOOK UNIVERSAL /leads (À PROVA DE MAKE)
+  // 🔥 WEBHOOK UNIVERSAL /leads (Compatível com N8N, Make, Zapier, etc.)
   // FASE 2: Normalização e Enriquecimento
   // ======================================================
   fastify.post('/leads', async (request, reply) => {
@@ -292,7 +311,7 @@ async function build() {
       // DEDUPLICAÇÃO (usando dados normalizados)
       // ============================================
       // Usa clienteId se fornecido, senão usa tenant padrão
-      const tenantId = await getOrCreateTenantByClienteId(clienteId);
+      const tenantId = await getOrCreateTenantByClienteIdUtil(clienteId);
 
       // Busca por telefone normalizado OU email (se fornecido)
       const existing = await prisma.lead.findFirst({
@@ -331,7 +350,7 @@ async function build() {
       // ============================================
       // ROTEAMENTO INTELIGENTE
       // ============================================
-      // Garantir que routing SEMPRE exista (obrigatório para Make)
+      // Garantir que routing SEMPRE exista (obrigatório para automações)
       let routing;
       if (classification) {
         try {
@@ -349,7 +368,7 @@ async function build() {
             { error: routingError },
             'Routing failed, using fallback'
           );
-          // Fallback seguro com valores corretos para Make
+          // Fallback seguro com valores padrão
           routing = getDefaultRouting();
         }
       } else {
@@ -369,7 +388,7 @@ async function build() {
         return reply.send({
           success: true,
           leadId: existing.id,
-          clienteId: tenantId, // Retorna clienteId para filtro no Make
+          clienteId: tenantId, // Retorna clienteId para filtro em automações
           message: 'Lead já existente',
           ...(classification && { classification }),
           routing: {
@@ -425,6 +444,167 @@ async function build() {
   // ======================================================
   await registerIntakeRoute(fastify);
   await registerConversationRoute(fastify);
+
+  // ======================================================
+  // GERENCIAMENTO DE TENANTS (CLIENTES)
+  // ======================================================
+  
+  // Listar todos os tenants (requer autenticação)
+  fastify.get('/tenants', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      // Usuário autenticado pode ver apenas seu próprio tenant
+      // Admin pode ver todos (futuro)
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      if (!userTenantId) {
+        return reply.status(403).send({
+          error: 'Acesso negado',
+          message: 'Não foi possível identificar seu tenant',
+        });
+      }
+
+      // Por enquanto, retorna apenas o tenant do usuário
+      // No futuro, admin pode ver todos
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: userTenantId },
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              leads: true,
+              users: true,
+            },
+          },
+        },
+      });
+
+      if (!tenant) {
+        return reply.status(404).send({
+          error: 'Tenant não encontrado',
+        });
+      }
+
+      return reply.send([tenant]); // Retorna array para manter compatibilidade
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao listar tenants',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Obter tenant específico (requer autenticação)
+  fastify.get('/tenants/:id', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      // Usuário só pode ver seu próprio tenant
+      if (id !== userTenantId) {
+        return reply.status(403).send({
+          error: 'Acesso negado',
+          message: 'Você só pode acessar seu próprio tenant',
+        });
+      }
+
+      const tenant = await prisma.tenant.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              leads: true,
+              users: true,
+            },
+          },
+        },
+      });
+
+      if (!tenant) {
+        return reply.status(404).send({
+          error: 'Tenant não encontrado',
+        });
+      }
+
+      return reply.send(tenant);
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao buscar tenant',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Criar tenant manualmente (requer autenticação - apenas admin no futuro)
+  fastify.post('/tenants', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const body = request.body as {
+        id?: string;
+        name: string;
+        plan?: string;
+      };
+
+      if (!body.name) {
+        return reply.status(400).send({
+          error: 'Nome é obrigatório',
+        });
+      }
+
+      // Por enquanto, qualquer usuário autenticado pode criar tenant
+      // No futuro, apenas admin
+      const tenant = await prisma.tenant.create({
+        data: {
+          id: body.id, // Se fornecido, usa o ID customizado
+          name: body.name,
+          plan: body.plan || 'free',
+        },
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return reply.status(201).send(tenant);
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      
+      // Se erro for de constraint única (ID duplicado)
+      if (errorMessage.includes('Unique constraint') || errorMessage.includes('duplicate key')) {
+        return reply.status(409).send({
+          error: 'Tenant já existe com este ID',
+        });
+      }
+
+      return reply.status(500).send({
+        error: 'Erro ao criar tenant',
+        message: errorMessage,
+      });
+    }
+  });
 
   return fastify;
 }
