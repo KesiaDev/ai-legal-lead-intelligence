@@ -673,6 +673,310 @@ async function build() {
     }
   });
 
+  // ======================================================
+  // API DE CONVERSAS - AÇÕES (requer autenticação)
+  // ======================================================
+
+  // Atualizar status da conversa
+  fastify.patch('/api/conversations/:id/status', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { status } = request.body as { status: string };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (!['active', 'paused', 'closed'].includes(status)) {
+        return reply.status(400).send({
+          error: 'Status inválido',
+          message: 'Status deve ser: active, paused ou closed',
+        });
+      }
+
+      // Verificar se a conversa pertence ao tenant do usuário
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!conversation) {
+        return reply.status(404).send({
+          error: 'Conversa não encontrada',
+        });
+      }
+
+      const updated = await prisma.conversation.update({
+        where: { id },
+        data: { status },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              status: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+          },
+        },
+      });
+
+      return reply.send({ conversation: updated });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar status',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Atualizar tipo de atribuição (ai, human, hybrid)
+  fastify.patch('/api/conversations/:id/assigned-type', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { assignedType } = request.body as { assignedType: string };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (!['ai', 'human', 'hybrid'].includes(assignedType)) {
+        return reply.status(400).send({
+          error: 'Tipo inválido',
+          message: 'Tipo deve ser: ai, human ou hybrid',
+        });
+      }
+
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!conversation) {
+        return reply.status(404).send({
+          error: 'Conversa não encontrada',
+        });
+      }
+
+      const updated = await prisma.conversation.update({
+        where: { id },
+        data: { assignedType },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              status: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+          },
+        },
+      });
+
+      return reply.send({ conversation: updated });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar tipo',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Registrar intenção detectada
+  fastify.post('/api/conversations/:id/intentions', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { intention } = request.body as { intention: string };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!conversation) {
+        return reply.status(404).send({
+          error: 'Conversa não encontrada',
+        });
+      }
+
+      // Criar mensagem do sistema com a intenção
+      const systemMessage = await prisma.message.create({
+        data: {
+          conversationId: id,
+          content: `Intenção detectada: ${intention}`,
+          senderType: 'system',
+        },
+      });
+
+      // Atualizar última mensagem da conversa com intenção (usando campo customizado se necessário)
+      // Por enquanto, apenas retornamos a mensagem criada
+      const updated = await prisma.conversation.findUnique({
+        where: { id },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              status: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+          },
+        },
+      });
+
+      // Adicionar intenção à última mensagem (se houver)
+      if (updated && updated.messages.length > 0) {
+        const lastMessage = updated.messages[updated.messages.length - 1];
+        // Nota: O schema atual não tem campo intention em Message
+        // Isso pode ser adicionado depois se necessário
+      }
+
+      return reply.send({
+        success: true,
+        intention,
+        message: systemMessage,
+        conversation: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao registrar intenção',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Enviar mensagem manual
+  fastify.post('/api/conversations/:id/messages', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { content, senderType = 'sdr' } = request.body as { content: string; senderType?: string };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (!content || !content.trim()) {
+        return reply.status(400).send({
+          error: 'Conteúdo da mensagem é obrigatório',
+        });
+      }
+
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!conversation) {
+        return reply.status(404).send({
+          error: 'Conversa não encontrada',
+        });
+      }
+
+      const message = await prisma.message.create({
+        data: {
+          conversationId: id,
+          content: content.trim(),
+          senderType,
+        },
+      });
+
+      // Atualizar updatedAt da conversa
+      await prisma.conversation.update({
+        where: { id },
+        data: { updatedAt: new Date() },
+      });
+
+      const updated = await prisma.conversation.findUnique({
+        where: { id },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              status: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 50,
+          },
+        },
+      });
+
+      return reply.send({
+        success: true,
+        message,
+        conversation: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao enviar mensagem',
+        message: errorMessage,
+      });
+    }
+  });
+
   // Criar tenant manualmente (requer autenticação - apenas admin no futuro)
   fastify.post('/tenants', {
     preHandler: [authenticate],

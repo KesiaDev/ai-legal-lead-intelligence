@@ -1,22 +1,40 @@
+import { useState } from 'react';
 import { ChatSimulator } from '@/components/chat/ChatSimulator';
+import { ChatLiveView } from '@/components/chat/ChatLiveView';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Bot, Shield, Clock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function ConversationsView() {
+  const [activeTab, setActiveTab] = useState('live');
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-display font-semibold text-foreground">
-          Simulador de Conversa
+          Conversas
         </h2>
         <p className="text-muted-foreground mt-1">
-          Teste o fluxo de atendimento automatizado do SDR Jurídico.
+          Gerencie conversas em tempo real ou teste o simulador
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Chat Simulator */}
-        <ChatSimulator />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList>
+          <TabsTrigger value="live">Chat ao Vivo</TabsTrigger>
+          <TabsTrigger value="simulator">Simulador</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="live" className="mt-6">
+          <div className="h-[calc(100vh-300px)]">
+            <ChatLiveView />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="simulator" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Chat Simulator */}
+            <ChatSimulator />
 
         {/* Info Cards */}
         <div className="space-y-4">
@@ -101,6 +119,8 @@ export function ConversationsView() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
