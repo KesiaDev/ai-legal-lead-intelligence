@@ -998,15 +998,6 @@ async function build() {
 
       const userData = await prisma.user.findUnique({
         where: { id: userId },
-        include: {
-          tenant: {
-            select: {
-              id: true,
-              name: true,
-              plan: true,
-            },
-          },
-        },
         select: {
           id: true,
           email: true,
