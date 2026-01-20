@@ -977,6 +977,229 @@ async function build() {
     }
   });
 
+  // ======================================================
+  // API DE USUÁRIO E PERFIL (requer autenticação)
+  // ======================================================
+
+  // Obter dados do usuário autenticado
+  fastify.get('/me', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userId = user?.id;
+      const userTenantId = user?.tenantId;
+
+      if (!userId || !userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const userData = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              plan: true,
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          tenant: {
+            select: {
+              id: true,
+              name: true,
+              plan: true,
+            },
+          },
+        },
+      });
+
+      if (!userData) {
+        return reply.status(404).send({
+          error: 'Usuário não encontrado',
+        });
+      }
+
+      return reply.send({
+        user: {
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          role: userData.role,
+        },
+        tenant: userData.tenant,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao buscar dados do usuário',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Atualizar perfil do usuário
+  fastify.patch('/api/user/profile', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userId = user?.id;
+      const { name, phone } = request.body as { name?: string; phone?: string };
+
+      if (!userId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          ...(name && { name }),
+          // Phone pode ser adicionado ao schema depois
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        user: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar perfil',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Listar usuários do tenant
+  fastify.get('/api/users', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const users = await prisma.user.findMany({
+        where: {
+          tenantId: userTenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      return reply.send({
+        users,
+        total: users.length,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao buscar usuários',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // ======================================================
+  // API DE TENANT - CONFIGURAÇÕES (requer autenticação)
+  // ======================================================
+
+  // Atualizar configurações da empresa
+  fastify.patch('/api/tenant/settings', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { name, phone, status } = request.body as {
+        name?: string;
+        phone?: string;
+        status?: string;
+      };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      // Verificar se o usuário tem permissão (admin)
+      const currentUser = await prisma.user.findUnique({
+        where: { id: user.id },
+      });
+
+      if (currentUser?.role !== 'admin') {
+        return reply.status(403).send({
+          error: 'Acesso negado',
+          message: 'Apenas administradores podem alterar configurações da empresa',
+        });
+      }
+
+      const updated = await prisma.tenant.update({
+        where: { id: userTenantId },
+        data: {
+          ...(name && { name }),
+          // Phone e status podem ser adicionados ao schema depois
+        },
+        select: {
+          id: true,
+          name: true,
+          plan: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        tenant: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar configurações',
+        message: errorMessage,
+      });
+    }
+  });
+
   // Criar tenant manualmente (requer autenticação - apenas admin no futuro)
   fastify.post('/tenants', {
     preHandler: [authenticate],

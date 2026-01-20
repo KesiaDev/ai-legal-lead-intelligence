@@ -22,6 +22,8 @@ interface AuthContextType {
   login: (data: LoginDto) => Promise<void>;
   register: (data: RegisterDto) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
+  refreshTenant: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -153,6 +155,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await authApi.me();
+      setUser(response.data.user);
+    } catch (err) {
+      console.error('Erro ao atualizar dados do usuário:', err);
+    }
+  };
+
+  const refreshTenant = async () => {
+    try {
+      const { api } = await import('@/api/client');
+      const response = await api.get('/tenants');
+      if (response.data && response.data.length > 0) {
+        setTenant(response.data[0]);
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar dados do tenant:', err);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -163,6 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
+        refreshTenant,
         isAuthenticated: !!user,
       }}
     >
