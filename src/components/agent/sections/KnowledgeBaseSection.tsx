@@ -110,21 +110,31 @@ export function KnowledgeBaseSection() {
   };
 
   const handleEdit = (item: ExtendedKnowledgeItem) => {
-    setEditingItem(item);
-    setFormData({
-      title: item.title,
-      content: item.content,
-      description: (item as any).description || '',
-      category: item.category || 'geral',
-      legalArea: item.legalArea || '',
-      priority: item.priority || 'media',
-    });
-    setIsDialogOpen(true);
+    // Pequeno delay para garantir que o dropdown feche antes de abrir o dialog
+    setTimeout(() => {
+      try {
+        setEditingItem(item);
+        setFormData({
+          title: item.title || '',
+          content: item.content || '',
+          description: (item as any).description || '',
+          category: item.category || 'geral',
+          legalArea: item.legalArea || '',
+          priority: item.priority || 'media',
+        });
+        setIsDialogOpen(true);
+      } catch (error) {
+        console.error('Erro ao editar item:', error);
+      }
+    }, 100);
   };
 
   const handleView = (item: ExtendedKnowledgeItem) => {
-    setViewingItem(item);
-    setIsViewDialogOpen(true);
+    // Pequeno delay para garantir que o dropdown feche antes de abrir o dialog
+    setTimeout(() => {
+      setViewingItem(item);
+      setIsViewDialogOpen(true);
+    }, 100);
   };
 
   const handleToggleActive = (item: ExtendedKnowledgeItem) => {
@@ -256,17 +266,30 @@ export function KnowledgeBaseSection() {
                       <MoreVertical className="w-4 h-4" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleView(item)}>
+                  <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleView(item);
+                      }}
+                    >
                       <Eye className="w-4 h-4 mr-2" />
                       Visualizar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(item)}>
+                    <DropdownMenuItem 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleEdit(item);
+                      }}
+                    >
                       <Edit className="w-4 h-4 mr-2" />
                       Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => removeKnowledgeItem(item.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        removeKnowledgeItem(item.id);
+                      }}
                       className="text-destructive"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
