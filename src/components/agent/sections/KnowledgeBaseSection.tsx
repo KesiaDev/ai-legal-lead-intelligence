@@ -19,6 +19,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -321,6 +322,9 @@ export function KnowledgeBaseSection() {
             <DialogTitle>
               {editingItem ? 'Editar Item' : 'Adicionar Item à Base de Conhecimento'}
             </DialogTitle>
+            <DialogDescription>
+              {editingItem ? 'Edite as informações do item da base de conhecimento' : 'Adicione um novo item à base de conhecimento para o agente consultar'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
