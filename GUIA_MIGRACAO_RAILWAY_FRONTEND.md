@@ -81,7 +81,23 @@ O `railway.json` já está configurado:
 
 ---
 
-## 🎯 Passo 6: Fazer Deploy
+## 🎯 Passo 6: Configurar Networking (Gerar URL Pública)
+
+1. No serviço, vá em **Settings → Networking**
+2. Clique em **"Generate Domain"** ou **"Gerar Domínio"**
+3. O Railway vai gerar uma URL automática (ex: `legal-lead-scout-production.up.railway.app`)
+4. **Copie essa URL** - você vai precisar dela para:
+   - Testar a aplicação
+   - Configurar CORS no backend
+
+**⚠️ IMPORTANTE:**
+- O networking é criado automaticamente, mas você precisa gerar o domínio
+- A URL é gerada automaticamente, mas você pode personalizar depois
+- Sem gerar o domínio, o serviço não fica acessível publicamente
+
+---
+
+## 🎯 Passo 7: Fazer Deploy
 
 1. Após configurar tudo, o Railway vai fazer deploy automaticamente
 2. Ou clique em **"Deploy"** manualmente
@@ -89,7 +105,7 @@ O `railway.json` já está configurado:
 
 ---
 
-## 🎯 Passo 7: Verificar Deploy
+## 🎯 Passo 8: Verificar Deploy
 
 ### **7.1. Verificar Logs**
 
@@ -116,7 +132,7 @@ O `railway.json` já está configurado:
 
 ---
 
-## 🎯 Passo 8: Configurar CORS no Backend
+## 🎯 Passo 9: Configurar CORS no Backend
 
 Se o frontend não conseguir se conectar ao backend:
 
