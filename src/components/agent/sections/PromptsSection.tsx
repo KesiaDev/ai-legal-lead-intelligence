@@ -35,7 +35,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Search,
   FileText,
@@ -46,10 +45,12 @@ import {
   Plus,
   Settings2,
   Cpu,
-  Target,
   AlertCircle,
+  Calendar,
+  MessageSquare,
 } from 'lucide-react';
 import { AgentPrompt } from '@/types/agent';
+import { PromptDetailView } from './PromptDetailView';
 
 const PROMPT_TYPES = {
   'Orquestrador': 'Orquestrador Conversacional',
@@ -68,6 +69,27 @@ const PROMPT_TYPES = {
   'compliance_oab': 'Compliance OAB',
   'inteligencia_funil': 'Inteligência do Funil',
   'acompanhamento': 'Acompanhamento Jurídico Inteligente',
+  'video_transcription': 'Transcrição de Vídeo',
+  'document_interpretate': 'Interpretação de Documento',
+  'document_interpretation': 'Interpretação de Documento',
+  'image_transcription': 'Transcrição de Imagem',
+  'conversation_summary': 'Resumo de Conversa',
+  'protractor': 'Protractor',
+};
+
+const PROMPT_ICONS: Record<string, any> = {
+  'Scheduler': Calendar,
+  'Orquestrador': MessageSquare,
+  'Qualificador': FileText,
+  'followup': FileText,
+  'insights': FileText,
+  'conversation_summary': FileText,
+  'video_transcription': FileText,
+  'document_interpretate': FileText,
+  'document_interpretation': FileText,
+  'image_transcription': FileText,
+  'Lembrete': Calendar,
+  'protractor': FileText,
 };
 
 export function PromptsSection() {
@@ -79,6 +101,7 @@ export function PromptsSection() {
   const [editingPrompt, setEditingPrompt] = useState<AgentPrompt | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [showDetailView, setShowDetailView] = useState(false);
 
   const filteredPrompts = prompts.filter(prompt => {
     const matchesSearch = prompt.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -89,7 +112,12 @@ export function PromptsSection() {
 
   const handleView = (prompt: AgentPrompt) => {
     setViewingPrompt(prompt);
-    setIsViewDialogOpen(true);
+    setShowDetailView(true);
+  };
+
+  const handleBackFromDetail = () => {
+    setShowDetailView(false);
+    setViewingPrompt(null);
   };
 
   const handleEdit = (prompt: AgentPrompt) => {
@@ -140,6 +168,17 @@ export function PromptsSection() {
     setIsEditDialogOpen(false);
     setEditingPrompt(null);
   };
+
+  // Se estiver visualizando detalhes, mostrar a tela de detalhes
+  if (showDetailView && viewingPrompt) {
+    return (
+      <PromptDetailView
+        prompt={viewingPrompt}
+        onBack={handleBackFromDetail}
+        isReadOnly={true}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -200,11 +239,11 @@ export function PromptsSection() {
               </SelectContent>
             </Select>
             <Select value={providerFilter} onValueChange={setProviderFilter}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Provider" />
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Todos os provedores" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos os provedores</SelectItem>
                 <SelectItem value="openai">OpenAI</SelectItem>
                 <SelectItem value="google">Google</SelectItem>
               </SelectContent>
@@ -233,9 +272,14 @@ export function PromptsSection() {
                 <TableRow key={prompt.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center">
-                        <FileText className="w-4 h-4 text-primary" />
-                      </div>
+                      {(() => {
+                        const Icon = PROMPT_ICONS[prompt.type] || FileText;
+                        return (
+                          <div className="w-8 h-8 rounded bg-primary/20 flex items-center justify-center">
+                            <Icon className="w-4 h-4 text-primary" />
+                          </div>
+                        );
+                      })()}
                       <span className="font-medium">{prompt.name}</span>
                     </div>
                   </TableCell>
@@ -244,23 +288,14 @@ export function PromptsSection() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{prompt.version}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        checked={prompt.status === 'ativo'}
-                        onCheckedChange={(checked) => 
-                          updatePrompt(prompt.id, { status: checked ? 'ativo' : 'inativo' })
-                        }
-                      />
-                      <Badge
-                        variant="secondary"
-                        className={prompt.status === 'ativo'
-                          ? 'bg-success/20 text-success'
-                          : 'bg-muted text-muted-foreground'
-                        }
-                      >
-                        {prompt.status}
-                      </Badge>
-                    </div>
+                    <Badge
+                      className={prompt.status === 'ativo'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-muted text-muted-foreground'
+                      }
+                    >
+                      {prompt.status}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline" className={
@@ -300,69 +335,6 @@ export function PromptsSection() {
         </CardContent>
       </Card>
 
-      {/* View Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              {viewingPrompt?.name}
-            </DialogTitle>
-          </DialogHeader>
-          {viewingPrompt && (
-            <Tabs defaultValue="content" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="content">Conteúdo</TabsTrigger>
-                <TabsTrigger value="config">Configuração</TabsTrigger>
-                <TabsTrigger value="context">Contexto</TabsTrigger>
-              </TabsList>
-              <TabsContent value="content" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground">Prompt Completo</Label>
-                  <div className="p-4 bg-muted/50 rounded-lg font-mono text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
-                    {viewingPrompt.content || 'Conteúdo do prompt não definido.'}
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="config" className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <Label className="text-muted-foreground text-xs">Tipo</Label>
-                    <p className="font-medium">{viewingPrompt.type}</p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <Label className="text-muted-foreground text-xs">Versão</Label>
-                    <p className="font-medium">{viewingPrompt.version}</p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <Label className="text-muted-foreground text-xs">Provider</Label>
-                    <p className="font-medium">{viewingPrompt.provider}</p>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <Label className="text-muted-foreground text-xs">Modelo</Label>
-                    <p className="font-medium">{viewingPrompt.model}</p>
-                  </div>
-                </div>
-              </TabsContent>
-              <TabsContent value="context" className="space-y-4 mt-4">
-                <Card className="bg-muted/30">
-                  <CardHeader>
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Target className="w-4 h-4" />
-                      Objetivo do Prompt
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {PROMPT_TYPES[viewingPrompt.type as keyof typeof PROMPT_TYPES] || viewingPrompt.type}
-                    </p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={(open) => {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAgent } from '@/contexts/AgentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,169 +7,114 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Power, PowerOff, Sparkles, Brain, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Power, PowerOff, Save, Plus, Pencil, Trash2, Clock, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+interface CommunicationChannel {
+  id: string;
+  name: string;
+  tags: string[];
+  type: 'chatguru' | 'manychat' | 'whatsapp' | 'other';
+}
 
 export function AgentConfigSection() {
   const { agent, updateAgent, followUpConfig, updateFollowUpConfig } = useAgent();
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [is24_7, setIs24_7] = useState(false);
+  const [channels, setChannels] = useState<CommunicationChannel[]>([
+    { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+    { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
+    { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+  ]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      // Simular salvamento
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast({
+        title: 'Configurações salvas!',
+        description: 'As configurações do agente foram atualizadas com sucesso.',
+        variant: 'default',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar as configurações.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddChannel = () => {
+    const newChannel: CommunicationChannel = {
+      id: Date.now().toString(),
+      name: 'Nova Integração',
+      tags: [],
+      type: 'other',
+    };
+    setChannels([...channels, newChannel]);
+  };
+
+  const handleDeleteChannel = (id: string) => {
+    setChannels(channels.filter(ch => ch.id !== id));
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-display font-semibold">Configurações Gerais</h2>
-          <p className="text-sm text-muted-foreground">Modo somente leitura</p>
+          <h2 className="text-2xl font-display font-semibold">Status do Agente</h2>
         </div>
+        <Button onClick={handleSave} disabled={isSaving} className="bg-green-600 hover:bg-green-700">
+          <Save className="w-4 h-4 mr-2" />
+          {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+        </Button>
       </div>
 
-      {/* Status do Agente */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Status do Agente</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={() => updateAgent({ isActive: true })}
-              className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all",
-                agent.isActive
-                  ? "bg-success text-white shadow-lg"
-                  : "bg-muted text-muted-foreground hover:bg-success/20"
-              )}
-            >
-              <Power className="w-4 h-4" />
-              ATIVO
-            </button>
-            <button
-              onClick={() => updateAgent({ isActive: false })}
-              className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all",
-                !agent.isActive
-                  ? "bg-destructive text-white shadow-lg"
-                  : "border border-destructive/30 text-destructive hover:bg-destructive/10"
-              )}
-            >
-              <PowerOff className="w-4 h-4" />
-              DESLIGAR
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Configuração de IA */}
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg">Inteligência Artificial</CardTitle>
-          </div>
-          <CardDescription>
-            Configure o comportamento da IA controlada para qualificação de leads
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Toggle IA */}
-          <div className="flex items-center justify-between p-4 border rounded-lg bg-background">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                agent.aiConfig.enabled ? "bg-primary/20" : "bg-muted"
-              )}>
-                <Brain className={cn(
-                  "w-5 h-5",
-                  agent.aiConfig.enabled ? "text-primary" : "text-muted-foreground"
-                )} />
-              </div>
-              <div>
-                <p className="font-medium">IA Controlada</p>
-                <p className="text-sm text-muted-foreground">
-                  {agent.aiConfig.enabled 
-                    ? "IA ativa para análise e sugestões" 
-                    : "Usando apenas fluxo manual"}
-                </p>
-              </div>
-            </div>
-            <Switch
-              checked={agent.aiConfig.enabled}
-              onCheckedChange={(enabled) => 
-                updateAgent({ aiConfig: { ...agent.aiConfig, enabled } })
-              }
-            />
-          </div>
-
-          {/* Nível de Intervenção */}
-          {agent.aiConfig.enabled && (
-            <div className="space-y-3">
-              <Label>Nível de Intervenção da IA</Label>
-              <Select
-                value={agent.aiConfig.interventionLevel}
-                onValueChange={(value: 'baixo' | 'medio') =>
-                  updateAgent({ aiConfig: { ...agent.aiConfig, interventionLevel: value } })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="baixo">
-                    <div className="flex items-center gap-2">
-                      <span>Baixo</span>
-                      <span className="text-xs text-muted-foreground">- Apenas análise passiva</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="medio">
-                    <div className="flex items-center gap-2">
-                      <span>Médio</span>
-                      <span className="text-xs text-muted-foreground">- Análise + sugestões ativas</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {agent.aiConfig.interventionLevel === 'baixo' 
-                  ? "A IA analisa as mensagens mas não interfere no fluxo."
-                  : "A IA sugere perguntas personalizadas e analisa respostas em tempo real."}
-              </p>
-            </div>
+      {/* Status do Agente - Botões no topo */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => updateAgent({ isActive: true })}
+          className={cn(
+            "flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all",
+            agent.isActive
+              ? "bg-green-600 text-white shadow-lg"
+              : "bg-muted text-muted-foreground hover:bg-green-600/20"
           )}
-
-          {/* Regras de Compliance */}
-          <div className="p-4 border rounded-lg bg-muted/30">
-            <div className="flex items-center gap-2 mb-3">
-              <Shield className="w-4 h-4 text-success" />
-              <span className="font-medium text-sm">Regras de Compliance Ativas</span>
-            </div>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                Nunca oferece consultoria jurídica
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                Nunca promete resultados
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                Mantém tom profissional e ético
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                Segue apenas fluxo definido
-              </li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+        >
+          <Power className="w-4 h-4" />
+          ATIVO
+        </button>
+        <button
+          onClick={() => updateAgent({ isActive: false })}
+          className={cn(
+            "flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all",
+            !agent.isActive
+              ? "bg-red-600 text-white shadow-lg"
+              : "border border-red-600/30 text-red-600 hover:bg-red-600/10"
+          )}
+        >
+          <PowerOff className="w-4 h-4" />
+          DESLIGAR
+        </button>
+      </div>
 
       {/* Tabs de Configuração */}
       <Card>
         <Tabs defaultValue="basic" className="w-full">
           <CardHeader className="pb-0">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+            <TabsList className="grid w-full grid-cols-4 bg-muted/50">
               <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
               <TabsTrigger value="hours">Horário de Funcionamento</TabsTrigger>
               <TabsTrigger value="channels">Canais de Comunicação</TabsTrigger>
+              <TabsTrigger value="credentials">Credenciais Avançadas</TabsTrigger>
             </TabsList>
           </CardHeader>
           <CardContent className="pt-6">
@@ -194,53 +140,107 @@ export function AgentConfigSection() {
               </div>
             </TabsContent>
 
-            <TabsContent value="hours" className="mt-0">
+            <TabsContent value="hours" className="mt-0 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Horário de Funcionamento</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Defina os horários de funcionamento do agente
+                </p>
+              </div>
+              
+              {/* Opção 24/7 Global */}
+              <div className="flex items-center justify-end mb-4">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={is24_7}
+                    onCheckedChange={(checked) => {
+                      setIs24_7(checked);
+                      if (checked) {
+                        const newHours = followUpConfig.businessHours.map(h => ({
+                          ...h,
+                          isOpen: true,
+                          is24h: true,
+                          startTime: '00:00',
+                          endTime: '23:59',
+                        }));
+                        updateFollowUpConfig({ businessHours: newHours });
+                      }
+                    }}
+                  />
+                  <Label>24/7</Label>
+                </div>
+              </div>
+
+              {/* Lista de dias */}
               <div className="space-y-3">
                 {followUpConfig.businessHours.map((schedule, index) => (
                   <div key={schedule.day} className="flex items-center gap-4 py-2">
                     <span className="w-12 font-medium text-sm">{schedule.day}</span>
                     {schedule.isOpen ? (
                       <>
-                        <Input
-                          type="time"
-                          value={schedule.startTime}
-                          onChange={(e) => {
-                            const newHours = [...followUpConfig.businessHours];
-                            newHours[index].startTime = e.target.value;
-                            updateFollowUpConfig({ businessHours: newHours });
-                          }}
-                          className="w-24"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            value={schedule.startTime}
+                            onChange={(e) => {
+                              const newHours = [...followUpConfig.businessHours];
+                              newHours[index].startTime = e.target.value;
+                              updateFollowUpConfig({ businessHours: newHours });
+                            }}
+                            className="w-24"
+                            disabled={is24_7}
+                          />
+                        </div>
                         <span className="text-muted-foreground">até</span>
-                        <Input
-                          type="time"
-                          value={schedule.endTime}
-                          onChange={(e) => {
-                            const newHours = [...followUpConfig.businessHours];
-                            newHours[index].endTime = e.target.value;
-                            updateFollowUpConfig({ businessHours: newHours });
-                          }}
-                          className="w-24"
-                        />
-                        <button
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <Input
+                            type="time"
+                            value={schedule.endTime}
+                            onChange={(e) => {
+                              const newHours = [...followUpConfig.businessHours];
+                              newHours[index].endTime = e.target.value;
+                              updateFollowUpConfig({ businessHours: newHours });
+                            }}
+                            className="w-24"
+                            disabled={is24_7}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
                           onClick={() => {
                             const newHours = [...followUpConfig.businessHours];
                             newHours[index].isOpen = false;
                             updateFollowUpConfig({ businessHours: newHours });
                           }}
-                          className="text-destructive text-sm hover:underline"
+                          className="h-8 w-8"
                         >
-                          ×
-                        </button>
-                        <button className="text-success text-sm hover:underline">+</button>
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
                         <div className="ml-auto flex items-center gap-2">
                           <Switch
                             checked={schedule.is24h || false}
                             onCheckedChange={(checked) => {
                               const newHours = [...followUpConfig.businessHours];
                               newHours[index].is24h = checked;
+                              if (checked) {
+                                newHours[index].startTime = '00:00';
+                                newHours[index].endTime = '23:59';
+                              }
                               updateFollowUpConfig({ businessHours: newHours });
                             }}
+                            disabled={is24_7}
                           />
                           <span className="text-xs text-muted-foreground">24h</span>
                         </div>
@@ -248,16 +248,19 @@ export function AgentConfigSection() {
                     ) : (
                       <>
                         <span className="text-muted-foreground">Fechado</span>
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
                           onClick={() => {
                             const newHours = [...followUpConfig.businessHours];
                             newHours[index].isOpen = true;
                             updateFollowUpConfig({ businessHours: newHours });
                           }}
-                          className="ml-auto text-primary text-sm hover:underline"
+                          className="ml-auto"
                         >
                           Ativar
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
@@ -265,32 +268,65 @@ export function AgentConfigSection() {
               </div>
             </TabsContent>
 
-            <TabsContent value="channels" className="mt-0">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                      <span className="text-green-500 font-bold">W</span>
+            <TabsContent value="channels" className="mt-0 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Canais de Comunicação</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Gerencie as integrações de comunicação do agente
+                </p>
+              </div>
+              
+              <div className="flex justify-end mb-4">
+                <Button onClick={handleAddChannel} variant="default" className="bg-green-600 hover:bg-green-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Integração
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {channels.map((channel) => (
+                  <div
+                    key={channel.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium mb-2">{channel.name}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {channel.tags.map((tag, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">WhatsApp</p>
-                      <p className="text-sm text-muted-foreground">Canal principal de atendimento</p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteChannel(channel.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg opacity-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                      <span className="text-blue-500 font-bold">@</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Email</p>
-                      <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-                    </div>
-                  </div>
-                  <Switch disabled />
-                </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="credentials" className="mt-0">
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-lg mb-2">Credenciais Avançadas</p>
+                <p className="text-sm">Configure credenciais e tokens de API para integrações avançadas.</p>
               </div>
             </TabsContent>
           </CardContent>

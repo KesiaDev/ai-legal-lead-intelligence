@@ -112,37 +112,47 @@ const defaultCommunication: CommunicationConfig = {
 const defaultPrompts: AgentPrompt[] = [
   {
     id: 'prompt-1',
-    name: 'Agente Conversacional',
-    type: 'Orquestrador',
-    version: 'v1',
+    name: 'Scheduler',
+    type: 'Scheduler',
+    version: 'v8',
     status: 'ativo',
     provider: 'OpenAI',
-    model: 'gpt-4',
-    content: `Você é um assistente jurídico profissional especializado em pré-vendas para escritórios de advocacia.
-
-OBJETIVO:
-- Qualificar leads de forma consultiva
-- Identificar área do direito e urgência
-- Encaminhar para atendimento humano quando apropriado
-
-REGRAS OBRIGATÓRIAS:
-1. NUNCA fornecer aconselhamento jurídico
-2. NUNCA prometer resultados em processos
-3. NUNCA usar linguagem informal excessiva
-4. SEMPRE manter tom profissional e empático
-5. SEMPRE respeitar LGPD e ética da OAB
-
-FLUXO:
-1. Saudação → 2. Identificar demanda → 3. Qualificar urgência → 4. Coletar dados → 5. Encaminhar`,
+    model: 'gpt-4.1',
+    content: `<objetivo>
+Você é o **Agente de AGENDA**, responsável por gerenciar consultas, agendamentos, remarcações e cancelamentos de reuniões.
+É o agente principal de coordenação de agenda no fluxo do orquestrador.
+Você nunca fala diretamente com o lead – responde **apenas em formato JSON estruturado**.
+Seu papel é garantir que **toda ação de agenda siga regras reais de disponibilidade, bloqueio e limites**, sempre com base nas ferramentas definidas.
+Você interpreta a linguagem natural enviada pelo lead (como "amanhã às 15h", "sexta às 10h") e converte para formato de data/hora padronizado ISO (YYYY-MM-DDTHH:mm:ss), **sem aplicar fuso horário**.
+Após interpretar, você chama diretamente o **HTTP Request de Validação de Horário** ("Validador de Horário") para confirmar se o horário é válido conforme as regras do cliente.
+</objetivo>`,
   },
   {
     id: 'prompt-2',
-    name: 'Qualificador Jurídico',
-    type: 'Qualificador',
-    version: 'v1',
+    name: 'Agente Conversacional',
+    type: 'Orquestrador',
+    version: 'v15',
     status: 'ativo',
     provider: 'OpenAI',
-    model: 'gpt-4',
+    model: 'gpt-4.1',
+    content: `<objetivo>
+Sua missão é:
+1. Atuar como SDR da "**Expert Integrado**" na qualificação de leads via WhatsApp, conduzindo conversas naturais, objetivas e profissionais.
+2. Compreender as necessidades do lead relacionadas à automação comercial e IA SDR.
+3. Coletar informações essenciais sobre a operação comercial da empresa de forma gradual e estratégica.
+4. Encaminhar leads qualificados para agendamento de reunião de diagnóstico com especialistas.
+5. **NUNCA repetir perguntas já respondidas pelo lead.**
+6. Não executa ferramentas diretamente, apenas coleta, organiza e passa dados para agentes auxiliares (Qualifier e Scheduler).
+</objetivo>`,
+  },
+  {
+    id: 'prompt-3',
+    name: 'Qualifier',
+    type: 'Qualificador',
+    version: 'v6',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1',
     content: `Analise a mensagem do lead e retorne:
 - area_direito: trabalhista | civil | familia | consumidor | previdenciario | criminal | empresarial | outro
 - urgencia: alta | media | baixa
@@ -152,25 +162,43 @@ FLUXO:
 NUNCA faça suposições. Se não tiver certeza, pergunte.`,
   },
   {
-    id: 'prompt-3',
-    name: 'Follow Up',
-    type: 'followup',
-    version: 'v1',
+    id: 'prompt-4',
+    name: 'Video Transcription',
+    type: 'video_transcription',
+    version: 'v2',
     status: 'ativo',
     provider: 'Google',
-    model: 'gemini-2.5-pro',
-    content: `Gere mensagens de follow-up cordiais e profissionais.
-Respeite o intervalo de tempo desde o último contato.
-Não seja insistente. Máximo de 3 tentativas.`,
+    model: 'models/gemini-2.5-pro',
+    content: `Transcreva o conteúdo de vídeos enviados pelo lead, extraindo informações relevantes para qualificação.`,
   },
   {
-    id: 'prompt-4',
-    name: 'Resumo de Conversa',
-    type: 'Resumo',
-    version: 'v1',
+    id: 'prompt-5',
+    name: 'Document Interpretation',
+    type: 'document_interpretate',
+    version: 'v2',
+    status: 'ativo',
+    provider: 'Google',
+    model: 'models/gemini-2.5-pro',
+    content: `Interprete documentos enviados pelo lead, extraindo informações relevantes para qualificação.`,
+  },
+  {
+    id: 'prompt-6',
+    name: 'Insights',
+    type: 'insights',
+    version: 'v4',
     status: 'ativo',
     provider: 'OpenAI',
-    model: 'gpt-4-turbo',
+    model: 'gpt-4.1-mini',
+    content: `Gere insights sobre a conversa com o lead, identificando padrões, necessidades e oportunidades.`,
+  },
+  {
+    id: 'prompt-7',
+    name: 'Conversation Summary',
+    type: 'conversation_summary',
+    version: 'v2',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1-mini',
     content: `Gere um resumo estruturado da conversa contendo:
 - Dados do lead
 - Área do direito identificada
@@ -179,18 +207,66 @@ Não seja insistente. Máximo de 3 tentativas.`,
 - Próximos passos sugeridos`,
   },
   {
-    id: 'prompt-5',
-    name: 'Agendamento',
-    type: 'Scheduler',
+    id: 'prompt-8',
+    name: 'Follow Up',
+    type: 'followup',
+    version: 'v2',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1',
+    content: `Gere mensagens de follow-up cordiais e profissionais.
+Respeite o intervalo de tempo desde o último contato.
+Não seja insistente. Máximo de 3 tentativas.`,
+  },
+  {
+    id: 'prompt-9',
+    name: 'protractor',
+    type: 'protractor',
+    version: 'v2',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1',
+    content: `Analise e extraia informações estruturadas de documentos e mensagens.`,
+  },
+  {
+    id: 'prompt-10',
+    name: 'Document Interpretation',
+    type: 'document_interpretation',
     version: 'v1',
     status: 'ativo',
     provider: 'OpenAI',
-    model: 'gpt-3.5-turbo',
-    content: `Conduza o agendamento de reunião:
-1. Confirmar disponibilidade do lead
-2. Oferecer horários disponíveis
-3. Confirmar data/hora escolhida
-4. Enviar confirmação com detalhes`,
+    model: 'gpt-4.1',
+    content: `Interprete documentos enviados pelo lead, extraindo informações relevantes para qualificação.`,
+  },
+  {
+    id: 'prompt-11',
+    name: 'Lembrete de reunião',
+    type: 'Lembrete',
+    version: 'v1',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1-mini',
+    content: `Gere lembretes de reunião agendada, enviando mensagens antes do horário combinado.`,
+  },
+  {
+    id: 'prompt-12',
+    name: 'Follow-Up Final',
+    type: 'followup',
+    version: 'v1',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1-mini',
+    content: `Gere a mensagem final de follow-up quando o lead não respondeu após múltiplas tentativas.`,
+  },
+  {
+    id: 'prompt-13',
+    name: 'Image Transcription',
+    type: 'image_transcription',
+    version: 'v1',
+    status: 'ativo',
+    provider: 'OpenAI',
+    model: 'gpt-4.1',
+    content: `Transcreva o conteúdo de imagens enviadas pelo lead, extraindo informações relevantes para qualificação.`,
   },
 ];
 
