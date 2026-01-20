@@ -62,6 +62,7 @@ export function KnowledgeBaseSection() {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
+    description: '',
     category: 'geral',
     legalArea: '',
     priority: 'media' as 'alta' | 'media' | 'baixa',
@@ -95,6 +96,7 @@ export function KnowledgeBaseSection() {
         id: `kb-${Date.now()}`,
         title: formData.title,
         content: formData.content,
+        description: formData.description,
         category: formData.category,
         legalArea: formData.legalArea,
         priority: formData.priority,
@@ -112,6 +114,7 @@ export function KnowledgeBaseSection() {
     setFormData({
       title: item.title,
       content: item.content,
+      description: (item as any).description || '',
       category: item.category || 'geral',
       legalArea: item.legalArea || '',
       priority: item.priority || 'media',
@@ -133,6 +136,7 @@ export function KnowledgeBaseSection() {
     setFormData({
       title: '',
       content: '',
+      description: '',
       category: 'geral',
       legalArea: '',
       priority: 'media',
@@ -219,28 +223,29 @@ export function KnowledgeBaseSection() {
                   <FileText className={`w-5 h-5 ${item.isActive ? 'text-success' : 'text-muted-foreground'}`} />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{item.title}</p>
                     <Badge variant="outline" className="text-xs capitalize">
                       {item.category}
                     </Badge>
-                    <Badge className={`text-xs ${getPriorityColor(item.priority || 'media')}`}>
+                    <Badge className={`text-xs ${getPriorityColor(item.priority || 'media')} capitalize`}>
                       {item.priority}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm text-muted-foreground">
-                      Criado em {format(item.createdAt, "dd/MM/yyyy", { locale: ptBR })}
-                    </p>
-                    {item.legalArea && (
-                      <Badge variant="secondary" className="text-xs">
-                        {LEGAL_AREAS[item.legalArea as keyof typeof LEGAL_AREAS] || item.legalArea}
-                      </Badge>
-                    )}
-                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Criado em {format(item.createdAt, "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleView(item)}
+                  className="h-8 w-8"
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
                 <Switch
                   checked={item.isActive}
                   onCheckedChange={() => handleToggleActive(item)}
@@ -296,11 +301,21 @@ export function KnowledgeBaseSection() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Título</Label>
+              <Label>Título *</Label>
               <Input
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Ex: Perguntas Frequentes sobre Trabalhista"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Descreva brevemente o conteúdo deste item..."
+                rows={2}
               />
             </div>
 
@@ -381,35 +396,47 @@ export function KnowledgeBaseSection() {
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <FileText className="w-5 h-5 text-primary" />
               {viewingItem?.title}
             </DialogTitle>
           </DialogHeader>
           {viewingItem && (
             <div className="space-y-4 py-4">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="capitalize">{viewingItem.category}</Badge>
-                <Badge className={getPriorityColor(viewingItem.priority || 'media')}>
+                <Badge variant="outline" className="capitalize">
+                  {viewingItem.category}
+                </Badge>
+                <Badge className={`${getPriorityColor(viewingItem.priority || 'media')} capitalize`}>
                   Prioridade: {viewingItem.priority}
                 </Badge>
-                {viewingItem.legalArea && (
-                  <Badge variant="secondary">
-                    {LEGAL_AREAS[viewingItem.legalArea as keyof typeof LEGAL_AREAS]}
+                {viewingItem.isActive && (
+                  <Badge className="bg-success text-white flex items-center gap-1">
+                    <Power className="w-3 h-3" />
+                    Ativo
                   </Badge>
                 )}
-                <Badge variant={viewingItem.isActive ? 'default' : 'secondary'}>
-                  {viewingItem.isActive ? '✅ Ativo' : '❌ Inativo'}
-                </Badge>
               </div>
-              <div className="p-4 bg-muted/50 rounded-lg whitespace-pre-wrap max-h-96 overflow-y-auto">
-                {viewingItem.content}
+              
+              {(viewingItem as any).description && (
+                <p className="text-sm text-muted-foreground">
+                  {(viewingItem as any).description}
+                </p>
+              )}
+              
+              <div className="p-6 bg-muted/30 rounded-lg border max-h-[60vh] overflow-y-auto">
+                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-sm">
+                  {viewingItem.content}
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Criado em {format(viewingItem.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-              </p>
+              
+              <div className="pt-2 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Criado em {format(viewingItem.createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              </div>
             </div>
           )}
         </DialogContent>
