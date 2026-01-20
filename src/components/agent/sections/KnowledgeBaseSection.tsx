@@ -362,14 +362,14 @@ export function KnowledgeBaseSection() {
               <div className="space-y-2">
                 <Label>Área do Direito</Label>
                 <Select
-                  value={formData.legalArea}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, legalArea: value }))}
+                  value={formData.legalArea || 'all'}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, legalArea: value === 'all' ? '' : value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas</SelectItem>
+                    <SelectItem value="all">Todas</SelectItem>
                     {Object.entries(LEGAL_AREAS).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
                     ))}
