@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { getOrCreateTenantByClienteId } from '../../utils/tenant';
 
 /**
  * Função mock para análise jurídica de leads
@@ -98,7 +99,7 @@ export async function registerIntakeRoute(fastify: FastifyInstance) {
       }
       
       // Validação dos campos obrigatórios
-      const { lead_id, mensagem, canal } = body;
+      const { lead_id, mensagem, canal, clienteId } = body;
       
       if (!lead_id || typeof lead_id !== 'string') {
         return reply.status(400).send({ 
@@ -121,6 +122,13 @@ export async function registerIntakeRoute(fastify: FastifyInstance) {
           message: 'canal must be a string if provided'
         });
       }
+
+      // Obter tenantId baseado no clienteId (se fornecido)
+      let tenantId: string | undefined;
+      if (clienteId && typeof clienteId === 'string') {
+        tenantId = await getOrCreateTenantByClienteId(clienteId);
+        fastify.log.info({ clienteId, tenantId }, 'Tenant identificado para intake');
+      }
       
       // Chamar função de análise jurídica (mock por enquanto)
       const analise = analyzeLead(mensagem);
@@ -129,6 +137,7 @@ export async function registerIntakeRoute(fastify: FastifyInstance) {
       return reply.status(200).send({
         lead_id,
         canal: canal || 'webhook',
+        ...(tenantId && { clienteId: tenantId }),
         analise: {
           area: analise.area,
           urgencia: analise.urgencia,

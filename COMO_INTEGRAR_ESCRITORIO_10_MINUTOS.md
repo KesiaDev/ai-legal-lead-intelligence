@@ -1,31 +1,35 @@
 # 🚀 Como Integrar Seu Escritório em 10 Minutos
 
-Guia rápido para integrar seu escritório jurídico com o SDR Advogados usando Make (Integromat).
+Guia rápido para integrar seu escritório jurídico com o SDR Advogados usando N8N.
 
 ---
 
 ## 📋 Pré-requisitos
 
-- Conta no Make (Integromat) - [Criar conta gratuita](https://www.make.com/)
+- N8N instalado (self-hosted ou cloud) - [Baixar N8N](https://n8n.io/)
 - URL da API: `https://sdradvogados.up.railway.app`
 - WhatsApp Business configurado (opcional, para automação completa)
 
 ---
 
-## ⚡ Passo 1: Configurar Webhook no Make (2 minutos)
+## ⚡ Passo 1: Configurar Webhook no N8N (2 minutos)
 
-### 1.1 Criar Novo Cenário
+### 1.1 Criar Novo Workflow
 
-1. Acesse [Make.com](https://www.make.com/)
-2. Clique em **"Create a new scenario"**
+1. Acesse seu N8N (local ou cloud)
+2. Clique em **"Add workflow"**
 3. Nomeie: `SDR Advogados - Captura de Leads`
 
 ### 1.2 Adicionar Trigger (Webhook)
 
-1. Clique em **"Add a module"**
-2. Busque por **"Webhooks"** → Selecione **"Custom webhook"**
-3. Clique em **"Add"**
-4. Copie a **URL do webhook** gerada (ex: `https://hook.make.com/xxxxx`)
+1. Clique em **"Add node"**
+2. Busque por **"Webhook"** → Selecione **"Webhook"**
+3. Configure:
+   - **HTTP Method**: `POST`
+   - **Path**: `/leads` (ou qualquer path de sua escolha)
+   - **Response Mode**: `Response Node`
+4. Clique em **"Execute Node"** para ativar
+5. Copie a **URL do webhook** gerada (ex: `https://seu-n8n.com/webhook/leads`)
 
 ---
 
@@ -33,16 +37,17 @@ Guia rápido para integrar seu escritório jurídico com o SDR Advogados usando 
 
 ### 2.1 Adicionar Filtro
 
-1. Após o webhook, adicione módulo **"Set variable"** ou **"Filter"**
+1. Após o webhook, adicione node **"IF"** (Conditional)
 2. Configure o filtro para verificar `clienteId`:
 
 ```
-clienteId = "seu-escritorio-id"
+{{ $json.body.clienteId }} = "seu-escritorio-id"
 ```
 
-**Exemplo de filtro:**
-- **Condition**: `clienteId` equals `"escritorio-123"`
-- **Action**: Continue only if condition is met
+**Exemplo de condição no N8N:**
+- **Condition**: `{{ $json.body.clienteId }}` equals `"escritorio-123"`
+- **True Output**: Continua o fluxo
+- **False Output**: Para o fluxo (ou envia para outro node)
 
 ### 2.2 Obter seu ClienteID
 
@@ -83,93 +88,113 @@ A resposta incluirá o `clienteId`:
 }
 ```
 
+### 2.3 Chamar API do SDR Advogados
+
+Após filtrar por `clienteId`, você precisa enviar os dados para a API:
+
+1. Adicione node **"HTTP Request"**
+2. Configure:
+   - **Method**: `POST`
+   - **URL**: `https://sdradvogados.up.railway.app/leads`
+   - **Authentication**: None (ou adicione se necessário)
+   - **Body Content Type**: `JSON`
+   - **Body**:
+   ```json
+   {
+     "nome": "{{ $json.body.nome }}",
+     "telefone": "{{ $json.body.telefone }}",
+     "email": "{{ $json.body.email }}",
+     "origem": "{{ $json.body.origem }}",
+     "clienteId": "{{ $json.body.clienteId }}"
+   }
+   ```
+
+3. A resposta da API conterá o `routing` que você usará no próximo passo
+
 ---
 
 ## ⚡ Passo 3: Configurar Ações Baseadas no Roteamento (3 minutos)
 
-### 3.1 Adicionar Router (Switch)
+### 3.1 Adicionar Switch (Router)
 
-1. Adicione módulo **"Router"** ou **"Switch"**
-2. Configure 3 rotas baseadas em `routing.destino`:
+1. Após o HTTP Request que chama a API, adicione node **"Switch"**
+2. Configure 3 rotas baseadas em `routing.destino` da **resposta da API**:
 
 #### Rota 1: `routing.destino = "whatsapp_humano"`
-- **Condição**: `routing.destino` equals `"whatsapp_humano"`
+- **Rule**: `{{ $json.routing.destino }}` equals `"whatsapp_humano"`
 - **Ação**: Enviar para WhatsApp (veja Passo 4)
 
 #### Rota 2: `routing.destino = "sdr_ia"`
-- **Condição**: `routing.destino` equals `"sdr_ia"`
+- **Rule**: `{{ $json.routing.destino }}` equals `"sdr_ia"`
 - **Ação**: Enviar para CRM ou sistema de nutrição
 
 #### Rota 3: `routing.destino = "nutricao"`
-- **Condição**: `routing.destino` equals `"nutricao"`
+- **Rule**: `{{ $json.routing.destino }}` equals `"nutricao"`
 - **Ação**: Adicionar à sequência de emails/mensagens
+
+**Importante:** Use `{{ $json.routing.destino }}` (sem `.body`) porque a resposta da API já está no formato JSON direto.
 
 ### 3.2 Filtrar por Urgência (Opcional)
 
-Dentro de cada rota, você pode filtrar por `routing.urgencia`:
+Dentro de cada rota, você pode filtrar por `routing.urgencia` usando expressão:
 
-- `"imediata"` → Ação imediata (notificação, WhatsApp)
-- `"alta"` → Ação em até 1 hora
-- `"normal"` → Ação em até 24 horas
+- `{{ $json.routing.urgencia }}` equals `"imediata"` → Ação imediata (notificação, WhatsApp)
+- `{{ $json.routing.urgencia }}` equals `"alta"` → Ação em até 1 hora
+- `{{ $json.routing.urgencia }}` equals `"normal"` → Ação em até 24 horas
 
 ---
 
 ## ⚡ Passo 4: Integrar WhatsApp (2 minutos)
 
-### 4.1 Usar Conector WhatsApp do Make
+### 4.1 Usar HTTP Request para API WhatsApp
 
-1. Na rota `whatsapp_humano`, adicione módulo **"WhatsApp"**
+1. Na rota `whatsapp_humano`, adicione node **"HTTP Request"**
 2. Configure:
-   - **To**: `{{telefone}}` (já normalizado pelo sistema)
-   - **Message**: Template personalizado
-
-**Exemplo de mensagem:**
-```
-Olá {{nome}}! 👋
-
-Recebemos seu contato sobre {{origem}}.
-
-Nossa equipe entrará em contato em breve!
-
-Equipe Jurídica
-```
-
-### 4.2 Usar API Externa (Evolution API, Twilio, etc.)
-
-Se preferir usar API externa:
-
-1. Adicione módulo **"HTTP"** → **"Make a request"**
-2. Configure:
-   - **URL**: Sua API WhatsApp
    - **Method**: `POST`
+   - **URL**: Sua API WhatsApp (Evolution API, Twilio, etc.)
    - **Body**:
    ```json
    {
-     "to": "{{telefone}}",
-     "message": "Olá {{nome}}! Recebemos seu contato.",
-     "clienteId": "{{clienteId}}"
+     "to": "{{ $('HTTP Request').json.body.telefone }}",
+     "message": "Olá {{ $('HTTP Request').json.body.nome }}! 👋\n\nRecebemos seu contato sobre {{ $('HTTP Request').json.body.origem }}.\n\nNossa equipe entrará em contato em breve!\n\nEquipe Jurídica",
+     "clienteId": "{{ $('HTTP Request').json.body.clienteId }}"
    }
    ```
 
+   **Nota:** Use `$('HTTP Request')` para acessar dados do node anterior, ou `{{ $json.leadId }}` para acessar dados da resposta da API.
+
+### 4.2 Usar N8N WhatsApp Node (se disponível)
+
+Se você tem o node do WhatsApp instalado no N8N:
+
+1. Adicione node **"WhatsApp"** (ou similar)
+2. Configure:
+   - **To**: `{{ $('HTTP Request').json.body.telefone }}`
+   - **Message**: Template personalizado usando expressões N8N
+
 ---
 
-## 📊 Estrutura Completa do Cenário Make
+## 📊 Estrutura Completa do Workflow N8N
 
 ```
-1. Webhook (Custom webhook)
+1. Webhook (recebe dados do formulário/site)
    ↓
-2. Filter (clienteId = "seu-escritorio-id")
+2. IF (clienteId = "seu-escritorio-id")
    ↓
-3. Router (Switch)
+3. HTTP Request (POST para API SDR Advogados /leads)
+   ↓
+4. Switch (routing.destino da resposta)
    ├─ Rota 1: routing.destino = "whatsapp_humano"
-   │  └─ WhatsApp / HTTP Request
+   │  └─ HTTP Request (WhatsApp API)
    │
    ├─ Rota 2: routing.destino = "sdr_ia"
-   │  └─ CRM / Sistema de nutrição
+   │  └─ HTTP Request (CRM / Sistema de nutrição)
    │
    └─ Rota 3: routing.destino = "nutricao"
-      └─ Email Marketing / Sequência
+      └─ HTTP Request (Email Marketing / Sequência)
 ```
+
+**Nota importante:** O N8N recebe os dados do seu formulário/site via webhook, processa e envia para a API do SDR Advogados. A resposta da API contém o `routing` que determina o próximo passo.
 
 ---
 
@@ -240,9 +265,10 @@ Content-Type: application/json
 
 ## ✅ Checklist de Integração
 
-- [ ] Webhook configurado no Make
-- [ ] Filtro por `clienteId` configurado
-- [ ] Router configurado com 3 rotas
+- [ ] Webhook configurado no N8N
+- [ ] Filtro por `clienteId` configurado (node IF)
+- [ ] HTTP Request configurado para chamar API `/leads`
+- [ ] Switch configurado com 3 rotas
 - [ ] WhatsApp integrado (se aplicável)
 - [ ] Testado com lead de exemplo
 - [ ] Notificações configuradas (opcional)
@@ -253,8 +279,8 @@ Content-Type: application/json
 
 ### Problema: Webhook não recebe dados
 - Verifique se a URL está correta
-- Confirme que o Make está ativo
-- Teste com Postman/Insomnia
+- Confirme que o N8N está rodando e o workflow está ativo
+- Teste com Postman/Insomnia diretamente na API
 
 ### Problema: Filtro não funciona
 - Verifique se `clienteId` está sendo enviado

@@ -553,6 +553,126 @@ async function build() {
     }
   });
 
+  // ======================================================
+  // API DE LEADS (requer autenticação)
+  // ======================================================
+  fastify.get('/api/leads', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+          message: 'Token de autenticação inválido',
+        });
+      }
+
+      const leads = await prisma.lead.findMany({
+        where: {
+          tenantId: userTenantId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          city: true,
+          state: true,
+          legalArea: true,
+          customLegalArea: true,
+          demandDescription: true,
+          urgency: true,
+          status: true,
+          contactPreference: true,
+          availableForHumanContact: true,
+          lgpdConsent: true,
+          lgpdConsentDate: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      return reply.send({
+        leads,
+        total: leads.length,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao buscar leads',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // ======================================================
+  // API DE CONVERSAS (requer autenticação)
+  // ======================================================
+  fastify.get('/api/conversations', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+          message: 'Token de autenticação inválido',
+        });
+      }
+
+      // Buscar conversas através dos leads do tenant
+      const conversations = await prisma.conversation.findMany({
+        where: {
+          lead: {
+            tenantId: userTenantId,
+          },
+        },
+        include: {
+          lead: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+              status: true,
+            },
+          },
+          messages: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 50, // Últimas 50 mensagens por conversa
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 100, // Últimas 100 conversas
+      });
+
+      return reply.send({
+        conversations,
+        total: conversations.length,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao buscar conversas',
+        message: errorMessage,
+      });
+    }
+  });
+
   // Criar tenant manualmente (requer autenticação - apenas admin no futuro)
   fastify.post('/tenants', {
     preHandler: [authenticate],

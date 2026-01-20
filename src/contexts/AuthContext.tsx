@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi, LoginDto, RegisterDto } from '@/api/auth';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(isDevelopment ? mockTenant : null);
   const [isLoading, setIsLoading] = useState(!isDevelopment);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Em desenvolvimento, não precisa verificar token
@@ -83,11 +85,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authApi.setToken(response.data.token);
       setUser(response.data.user);
       setTenant(response.data.tenant);
+      
+      toast({
+        title: 'Login realizado com sucesso!',
+        description: `Bem-vindo, ${response.data.user.name}!`,
+        variant: 'default',
+      });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message 
+      const errorMessage = err.response?.data?.error || err.response?.data?.message 
         || err.message 
-        || 'Erro ao fazer login. Verifique se o backend está online.';
+        || 'Erro ao fazer login. Verifique suas credenciais e se o backend está online.';
       setError(errorMessage);
+      
+      toast({
+        title: 'Erro ao fazer login',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      
       throw err;
     } finally {
       setIsLoading(false);
@@ -102,11 +117,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authApi.setToken(response.data.token);
       setUser(response.data.user);
       setTenant(response.data.tenant);
+      
+      toast({
+        title: 'Conta criada com sucesso!',
+        description: `Bem-vindo ao SDR Advogados, ${response.data.user.name}!`,
+        variant: 'default',
+      });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message 
+      const errorMessage = err.response?.data?.error || err.response?.data?.message 
         || err.message 
-        || 'Erro ao criar conta. Verifique se o backend está online.';
+        || 'Erro ao criar conta. Verifique os dados e se o backend está online.';
       setError(errorMessage);
+      
+      toast({
+        title: 'Erro ao criar conta',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+      
       throw err;
     } finally {
       setIsLoading(false);
@@ -117,6 +145,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authApi.logout();
     setUser(null);
     setTenant(null);
+    
+    toast({
+      title: 'Logout realizado',
+      description: 'Você foi desconectado com sucesso.',
+      variant: 'default',
+    });
   };
 
   return (

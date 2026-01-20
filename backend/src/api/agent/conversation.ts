@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { getOrCreateTenantByClienteId } from '../../utils/tenant';
 
 /**
  * Estados da conversa
@@ -119,7 +120,7 @@ function generateAgentResponse(
   switch (currentData.state) {
     case 'greeting':
       return {
-        message: 'Olá! Bem-vindo(a) ao atendimento jurídico. Antes de prosseguirmos, informamos que seus dados serão utilizados exclusivamente para contato e encaminhamento ao advogado responsável, em conformidade com a Lei Geral de Proteção de Dados (LGPD).\n\nVocê concorda em prosseguir com o atendimento?',
+        message: 'Olá! Sou o Super SDR Advogados, seu assistente virtual de pré-atendimento jurídico. Estou aqui para ajudá-lo(a) a entender sua demanda e conectá-lo(a) com o advogado mais adequado.\n\nAntes de prosseguirmos, informamos que seus dados serão utilizados exclusivamente para contato e encaminhamento ao advogado responsável, em conformidade com a Lei Geral de Proteção de Dados (LGPD).\n\nVocê concorda em prosseguir com o atendimento?',
         next_state: 'lgpd_consent',
         options: ['Sim, concordo', 'Não concordo'],
       };
@@ -127,7 +128,7 @@ function generateAgentResponse(
     case 'lgpd_consent':
       if (msgLower.includes('sim') || msgLower.includes('concordo') || msgLower.includes('aceito')) {
         return {
-          message: 'Obrigado por seu consentimento. Para iniciarmos, qual é o seu nome completo?',
+          message: 'Perfeito! Obrigado por seu consentimento. Para que eu possa ajudá-lo(a) da melhor forma, qual é o seu nome completo?',
           next_state: 'collecting_name',
         };
       } else {
@@ -305,7 +306,7 @@ export async function registerConversationRoute(fastify: FastifyInstance) {
         });
       }
       
-      const { lead_id, message, conversation_data } = body;
+      const { lead_id, message, conversation_data, clienteId } = body;
       
       if (!lead_id || typeof lead_id !== 'string') {
         return reply.status(400).send({
@@ -319,6 +320,13 @@ export async function registerConversationRoute(fastify: FastifyInstance) {
           error: 'Missing or invalid message',
           message: 'message is required and must be a string',
         });
+      }
+
+      // Obter tenantId baseado no clienteId (se fornecido)
+      let tenantId: string | undefined;
+      if (clienteId && typeof clienteId === 'string') {
+        tenantId = await getOrCreateTenantByClienteId(clienteId);
+        fastify.log.info({ clienteId, tenantId }, 'Tenant identificado para conversação');
       }
       
       // Recuperar ou inicializar dados da conversa
@@ -377,6 +385,7 @@ export async function registerConversationRoute(fastify: FastifyInstance) {
       // Retornar resposta
       return reply.status(200).send({
         lead_id,
+        ...(tenantId && { clienteId: tenantId }),
         state: currentData.state,
         message: agentResponse.message,
         options: agentResponse.options,
