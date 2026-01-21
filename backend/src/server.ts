@@ -473,7 +473,11 @@ async function build() {
 
       const fs = require('fs');
       const path = require('path');
-      const sqlPath = path.join(__dirname, '../prisma/migrations/20250120000000_add_pipelines_and_deals/migration_safe.sql');
+      // Tentar primeiro o arquivo direto, depois o safe
+      let sqlPath = path.join(__dirname, '../fix-migration-direct.sql');
+      if (!fs.existsSync(sqlPath)) {
+        sqlPath = path.join(__dirname, '../prisma/migrations/20250120000000_add_pipelines_and_deals/migration_safe.sql');
+      }
       
       if (!fs.existsSync(sqlPath)) {
         return reply.status(404).send({ error: 'Arquivo SQL não encontrado' });
