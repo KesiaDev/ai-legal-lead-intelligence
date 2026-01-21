@@ -8,6 +8,14 @@ import { Camera, Save, X } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export function UserProfileSettings() {
   const { user, refreshUser } = useAuth();
@@ -60,12 +68,70 @@ export function UserProfileSettings() {
     }
   };
 
-  const handleChangePassword = () => {
-    toast({
-      title: 'Em breve',
-      description: 'A funcionalidade de alteração de senha estará disponível em breve.',
-      variant: 'default',
-    });
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast({
+        title: 'Campos obrigatórios',
+        description: 'Preencha todos os campos de senha.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast({
+        title: 'Senhas não coincidem',
+        description: 'A nova senha e a confirmação devem ser iguais.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      toast({
+        title: 'Senha muito curta',
+        description: 'A senha deve ter pelo menos 6 caracteres.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await api.patch('/api/user/password', {
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      });
+
+      toast({
+        title: 'Senha alterada!',
+        description: 'Sua senha foi alterada com sucesso.',
+        variant: 'success',
+      });
+
+      setShowPasswordDialog(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao alterar senha',
+        description: err.response?.data?.error || 'Não foi possível alterar a senha.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -104,11 +170,27 @@ export function UserProfileSettings() {
                   variant="outline"
                   className="absolute bottom-0 right-0 rounded-full w-8 h-8"
                   onClick={() => {
-                    toast({
-                      title: 'Em breve',
-                      description: 'Upload de foto estará disponível em breve.',
-                      variant: 'default',
-                    });
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        // Por enquanto, apenas mostra preview local
+                        // TODO: Implementar upload para servidor
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          // Preview local apenas
+                          toast({
+                            title: 'Foto selecionada',
+                            description: 'Upload de foto será implementado em breve. Por enquanto, apenas preview local.',
+                            variant: 'default',
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    };
+                    input.click();
                   }}
                 >
                   <Camera className="w-4 h-4" />
@@ -190,13 +272,65 @@ export function UserProfileSettings() {
                   Altere sua senha para manter sua conta segura
                 </p>
               </div>
-              <Button variant="outline" onClick={handleChangePassword}>
+              <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
                 Alterar Senha
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog de Alteração de Senha */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogDescription>
+              Digite sua senha atual e a nova senha desejada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Senha Atual</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                placeholder="Digite sua senha atual"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova Senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                placeholder="Digite a nova senha (mín. 6 caracteres)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                placeholder="Confirme a nova senha"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleChangePassword} disabled={isChangingPassword}>
+              {isChangingPassword ? 'Alterando...' : 'Alterar Senha'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
