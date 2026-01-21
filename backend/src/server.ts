@@ -1676,6 +1676,49 @@ async function build() {
 // ======================================================
 async function start() {
   try {
+    // Resolver migration falhada antes de conectar
+    try {
+      const failedMigrations = await prisma.$queryRawUnsafe(`
+        SELECT * FROM "_prisma_migrations" 
+        WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
+        AND finished_at IS NULL
+      `) as any[];
+
+      if (failedMigrations && failedMigrations.length > 0) {
+        fastify.log.warn('⚠️  Migration falhada detectada. Tentando resolver...');
+        
+        // Remover migration falhada
+        await prisma.$executeRawUnsafe(`
+          DELETE FROM "_prisma_migrations" 
+          WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
+          AND finished_at IS NULL
+        `);
+
+        // Marcar como resolvida
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO "_prisma_migrations" (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count)
+          SELECT 
+            gen_random_uuid(),
+            '',
+            NOW(),
+            '20250120000000_add_pipelines_and_deals',
+            NULL,
+            NULL,
+            NOW(),
+            1
+          WHERE NOT EXISTS (
+            SELECT 1 FROM "_prisma_migrations" 
+            WHERE migration_name = '20250120000000_add_pipelines_and_deals' AND finished_at IS NOT NULL
+          )
+        `);
+
+        fastify.log.info('✅ Migration falhada resolvida');
+      }
+    } catch (migrationError) {
+      fastify.log.warn('⚠️  Erro ao resolver migration (continuando):', migrationError);
+      // Não bloquear o startup
+    }
+
     await prisma.$connect();
     const app = await build();
 
