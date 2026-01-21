@@ -9,6 +9,8 @@ import prisma from './config/database';
 
 import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
+import { registerPipelineRoutes } from './api/pipelines/routes';
+import { registerCrmRoutes } from './api/crm/routes';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
@@ -444,6 +446,16 @@ async function build() {
   // ======================================================
   await registerIntakeRoute(fastify);
   await registerConversationRoute(fastify);
+
+  // ======================================================
+  // PIPELINES E DEALS
+  // ======================================================
+  await registerPipelineRoutes(fastify);
+
+  // ======================================================
+  // INTEGRAÇÕES CRM
+  // ======================================================
+  await registerCrmRoutes(fastify);
 
   // ======================================================
   // GERENCIAMENTO DE TENANTS (CLIENTES)
@@ -1082,6 +1094,71 @@ async function build() {
     }
   });
 
+  // Alterar senha do usuário
+  fastify.patch('/api/user/password', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userId = user?.id;
+      const { currentPassword, newPassword } = request.body as { currentPassword?: string; newPassword?: string };
+
+      if (!userId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (!currentPassword || !newPassword) {
+        return reply.status(400).send({
+          error: 'Senha atual e nova senha são obrigatórias',
+        });
+      }
+
+      if (newPassword.length < 6) {
+        return reply.status(400).send({
+          error: 'A nova senha deve ter pelo menos 6 caracteres',
+        });
+      }
+
+      const userData = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!userData) {
+        return reply.status(404).send({
+          error: 'Usuário não encontrado',
+        });
+      }
+
+      const valid = await bcrypt.compare(currentPassword, userData.password);
+      if (!valid) {
+        return reply.status(401).send({
+          error: 'Senha atual incorreta',
+        });
+      }
+
+      const hashed = await bcrypt.hash(newPassword, 10);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashed },
+      });
+
+      return reply.send({
+        success: true,
+        message: 'Senha alterada com sucesso',
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao alterar senha',
+        message: errorMessage,
+      });
+    }
+  });
+
   // Listar usuários do tenant
   fastify.get('/api/users', {
     preHandler: [authenticate],
@@ -1122,6 +1199,286 @@ async function build() {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
       return reply.status(500).send({
         error: 'Erro ao buscar usuários',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Criar novo usuário
+  fastify.post('/api/users', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { name, email, password, role = 'user' } = request.body as {
+        name?: string;
+        email?: string;
+        password?: string;
+        role?: string;
+      };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (!name || !email || !password) {
+        return reply.status(400).send({
+          error: 'Nome, email e senha são obrigatórios',
+        });
+      }
+
+      if (password.length < 6) {
+        return reply.status(400).send({
+          error: 'A senha deve ter pelo menos 6 caracteres',
+        });
+      }
+
+      if (!['admin', 'user', 'sdr'].includes(role)) {
+        return reply.status(400).send({
+          error: 'Role inválido. Use: admin, user ou sdr',
+        });
+      }
+
+      const exists = await prisma.user.findUnique({ where: { email } });
+      if (exists) {
+        return reply.status(400).send({
+          error: 'Email já cadastrado',
+        });
+      }
+
+      const hashed = await bcrypt.hash(password, 10);
+
+      const newUser = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashed,
+          role,
+          tenantId: userTenantId,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        user: newUser,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao criar usuário',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Atualizar usuário
+  fastify.patch('/api/users/:id', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { name, email, role } = request.body as {
+        name?: string;
+        email?: string;
+        role?: string;
+      };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const targetUser = await prisma.user.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!targetUser) {
+        return reply.status(404).send({
+          error: 'Usuário não encontrado',
+        });
+      }
+
+      if (role && !['admin', 'user', 'sdr'].includes(role)) {
+        return reply.status(400).send({
+          error: 'Role inválido. Use: admin, user ou sdr',
+        });
+      }
+
+      if (email && email !== targetUser.email) {
+        const exists = await prisma.user.findUnique({ where: { email } });
+        if (exists) {
+          return reply.status(400).send({
+            error: 'Email já cadastrado',
+          });
+        }
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: {
+          ...(name && { name }),
+          ...(email && { email }),
+          ...(role && { role }),
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        user: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar usuário',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Ativar/Desativar usuário
+  fastify.patch('/api/users/:id/status', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+      const { isActive } = request.body as { isActive?: boolean };
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      if (typeof isActive !== 'boolean') {
+        return reply.status(400).send({
+          error: 'isActive deve ser um boolean',
+        });
+      }
+
+      const targetUser = await prisma.user.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!targetUser) {
+        return reply.status(404).send({
+          error: 'Usuário não encontrado',
+        });
+      }
+
+      // Não permitir desativar a si mesmo
+      if (id === user.id && !isActive) {
+        return reply.status(400).send({
+          error: 'Você não pode desativar sua própria conta',
+        });
+      }
+
+      const updated = await prisma.user.update({
+        where: { id },
+        data: { isActive },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+
+      return reply.send({
+        success: true,
+        user: updated,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao atualizar status do usuário',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // Deletar usuário
+  fastify.delete('/api/users/:id', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { id } = request.params as { id: string };
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      const userTenantId = user?.tenantId;
+
+      if (!userTenantId) {
+        return reply.status(401).send({
+          error: 'Não autenticado',
+        });
+      }
+
+      const targetUser = await prisma.user.findFirst({
+        where: {
+          id,
+          tenantId: userTenantId,
+        },
+      });
+
+      if (!targetUser) {
+        return reply.status(404).send({
+          error: 'Usuário não encontrado',
+        });
+      }
+
+      // Não permitir deletar a si mesmo
+      if (id === user.id) {
+        return reply.status(400).send({
+          error: 'Você não pode deletar sua própria conta',
+        });
+      }
+
+      await prisma.user.delete({
+        where: { id },
+      });
+
+      return reply.send({
+        success: true,
+        message: 'Usuário removido com sucesso',
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao deletar usuário',
         message: errorMessage,
       });
     }

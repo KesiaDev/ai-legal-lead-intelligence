@@ -21,9 +21,11 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  leads     Lead[]
-  pipelines PipelineStage[]
+  users           User[]
+  leads           Lead[]
+  pipelines       Pipeline[]
+  deals           Deal[]
+  crmIntegrations CrmIntegration[]
 
   @@index([plan])
 }
@@ -33,15 +35,15 @@ model Tenant {
 ////////////////////
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  password  String
-  role      String   @default("user") // admin | user | sdr
-  isActive  Boolean  @default(true)
+  id       String  @id @default(uuid())
+  email    String  @unique
+  name     String
+  password String
+  role     String  @default("user") // admin | user | sdr
+  isActive Boolean @default(true)
 
-  tenantId  String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -55,41 +57,42 @@ model User {
 ////////////////////
 
 model Lead {
-  id                        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  tenantId                  String
-  tenant                    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name                      String
-  phone                     String
-  email                     String?
+  name  String
+  phone String
+  email String?
 
-  city                      String?
-  state                     String?
+  city  String?
+  state String?
 
-  legalArea                 String?
-  customLegalArea           String?
-  demandDescription         String?  @db.Text
+  legalArea         String?
+  customLegalArea   String?
+  demandDescription String? @db.Text
 
-  urgency                   String?  // baixa | media | alta | urgente
+  urgency String? // baixa | media | alta | urgente
 
-  status                    String   @default("novo")
+  status String @default("novo")
   // novo | em_triagem | qualificado | consulta_agendada | compareceu
   // contrato_enviado | contrato_assinado | perdido
 
-  contactPreference         String?
-  availableForHumanContact  Boolean  @default(true)
+  contactPreference        String?
+  availableForHumanContact Boolean @default(true)
 
-  lgpdConsent               Boolean  @default(false)
-  lgpdConsentDate           DateTime?
+  lgpdConsent     Boolean   @default(false)
+  lgpdConsentDate DateTime?
 
-  scheduledContact          DateTime?
+  scheduledContact DateTime?
 
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  conversations             Conversation[]
-  pipelineHistory           PipelineHistory[]
+  conversations   Conversation[]
+  pipelineHistory PipelineHistory[]
+  deals           Deal[]
 
   @@index([tenantId])
   @@index([status])
@@ -101,21 +104,21 @@ model Lead {
 ////////////////////
 
 model Conversation {
-  id            String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  tenantId      String
+  tenantId String
 
-  leadId        String
-  lead          Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  channel       String   // whatsapp | chat | email | instagram
-  assignedType  String   @default("ai") // ai | human | hybrid
-  status        String   @default("active") // active | paused | closed
+  channel      String // whatsapp | chat | email | instagram
+  assignedType String @default("ai") // ai | human | hybrid
+  status       String @default("active") // active | paused | closed
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  messages      Message[]
+  messages Message[]
 
   @@index([tenantId])
   @@index([leadId])
@@ -127,15 +130,15 @@ model Conversation {
 ////////////////////
 
 model Message {
-  id             String   @id @default(uuid())
+  id String @id @default(uuid())
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  content        String   @db.Text
-  senderType     String   // lead | sdr | ai
+  content    String @db.Text
+  senderType String // lead | sdr | ai
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([conversationId])
   @@index([senderType])
@@ -145,38 +148,145 @@ model Message {
 // PIPELINE       //
 ////////////////////
 
-model PipelineStage {
-  id        String   @id @default(uuid())
+model Pipeline {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tenantId  String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  name      String
-  order     Int
-  color     String?
+  name        String // "Black Friday", "Educacional", "Parceria", "Projetos"
+  description String?
+  isActive    Boolean @default(true)
+  color       String? // Cor do pipeline
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  stages PipelineStage[]
+  deals  Deal[]
+
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([isActive])
+}
+
+model PipelineStage {
+  id String @id @default(uuid())
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  name  String // "LEAD MAPEADO", "CONTATO REALIZADO", etc.
+  order Int // Ordem no funil
+  color String? // Cor da etapa
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deals   Deal[]
+  history PipelineHistory[]
+
+  @@unique([pipelineId, name])
+  @@index([pipelineId])
+  @@index([order])
+}
+
+model Deal {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  stageId String
+  stage   PipelineStage @relation(fields: [stageId], references: [id])
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  title    String // Título do negócio
+  value    Float? // Valor do negócio
+  currency String @default("BRL") // BRL, USD, EUR
+
+  // Dados do CRM externo (para sincronização)
+  crmId   String? // ID no CRM externo (Pipedrive, Advbox, etc.)
+  crmType String? // "pipedrive", "advbox", "hubspot", etc.
+  crmData Json? // Dados adicionais do CRM
+
+  assignedTo String? // userId
+  notes      String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  history PipelineHistory[]
+
+  @@index([tenantId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([leadId])
+  @@index([crmId, crmType])
 }
 
 model PipelineHistory {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  tenantId  String
+  tenantId String
 
-  leadId    String
-  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  dealId String?
+  deal   Deal?   @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   stageName String
-  changedBy String?  // userId ou 'ai'
-  notes     String?  @db.Text
+  changedBy String? // userId ou 'ai'
+  notes     String? @db.Text
 
-  createdAt DateTime @default(now())
+  createdAt       DateTime       @default(now())
+  PipelineStage   PipelineStage? @relation(fields: [pipelineStageId], references: [id])
+  pipelineStageId String?
 
   @@index([tenantId])
   @@index([leadId])
+  @@index([dealId])
 }
 
+////////////////////
+// CRM INTEGRATION//
+////////////////////
+
+model CrmIntegration {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type     String // "pipedrive", "advbox", "hubspot", "salesforce", "zoho", etc.
+  name     String // Nome da integração
+  isActive Boolean @default(true)
+
+  // Credenciais (criptografadas)
+  apiKey      String? // API Key ou Token
+  apiSecret   String? // API Secret (se necessário)
+  apiUrl      String? // URL base da API
+  workspaceId String? // ID do workspace no CRM
+
+  // Configurações
+  syncDirection String  @default("bidirectional") // "bidirectional", "to_crm", "from_crm"
+  autoSync      Boolean @default(true)
+  syncInterval  Int     @default(3600) // Segundos
+
+  // Mapeamento de campos
+  fieldMapping Json? // Mapeamento de campos entre sistemas
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSyncAt DateTime?
+
+  @@unique([tenantId, type, workspaceId])
+  @@index([tenantId])
+  @@index([type])
+  @@index([isActive])
+}
