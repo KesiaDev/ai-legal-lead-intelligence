@@ -7,8 +7,16 @@ const prisma = new PrismaClient();
 async function resolveFailedMigration() {
   try {
     console.log('🔧 Verificando e resolvendo migrations falhadas...\n');
-
-    await prisma.$connect();
+    
+    // Conectar ao banco
+    try {
+      await prisma.$connect();
+      console.log('✅ Conectado ao banco de dados');
+    } catch (connectError: any) {
+      console.error('❌ Erro ao conectar ao banco:', connectError.message);
+      // Tentar continuar mesmo se não conectar (pode ser que o banco ainda não esteja pronto)
+      return;
+    }
 
     // Verificar se há migration falhada
     const failedMigrations = await prisma.$queryRawUnsafe(`

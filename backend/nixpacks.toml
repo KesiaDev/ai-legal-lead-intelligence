@@ -5,7 +5,7 @@ nixPkgs = ["nodejs-18_x", "npm"]
 cmds = ["npm ci"]
 
 [phases.build]
-cmds = ["npm run db:generate"]
+cmds = ["npm run db:generate", "node pre-start.js || true"]
 
 [start]
 cmd = "npm start"
