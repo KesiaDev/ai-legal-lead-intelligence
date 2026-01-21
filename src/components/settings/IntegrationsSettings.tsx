@@ -393,12 +393,13 @@ export function IntegrationsSettings() {
                   <div className="flex gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
                     <div className="text-sm text-blue-900">
-                      <p className="font-medium mb-1">Como funciona:</p>
+                      <p className="font-medium mb-1">⚠️ Importante:</p>
                       <ul className="list-disc list-inside space-y-1 text-blue-800">
-                        <li>Evolution API gerencia conexão com WhatsApp</li>
-                        <li>N8N usa Evolution para enviar mensagens</li>
-                        <li>Mensagens recebidas no WhatsApp chegam via N8N</li>
-                        <li>Configure no N8N, não diretamente aqui (por enquanto)</li>
+                        <li><strong>Evolution API funciona no N8N, não aqui!</strong></li>
+                        <li>Esta tela é apenas para referência/documentação</li>
+                        <li>Configure a Evolution API diretamente no seu workflow N8N</li>
+                        <li>Se você usa Evolution compartilhada, não precisa preencher aqui</li>
+                        <li>Se cada cliente tem Evolution própria, eles te passam as credenciais e você configura no N8N</li>
                       </ul>
                     </div>
                   </div>
