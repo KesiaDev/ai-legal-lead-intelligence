@@ -6,7 +6,6 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "prestart": "node pre-start.js || true",
     "start": "tsx src/server.ts",
     "start:direct": "tsx src/server.ts",
     "db:generate": "prisma generate",
