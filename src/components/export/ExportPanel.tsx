@@ -11,24 +11,43 @@ export function ExportPanel() {
   const [lastExport, setLastExport] = useState<string | null>(null);
 
   const handleExport = (format: 'csv' | 'json') => {
-    const data = exportLeads(format);
-    const blob = new Blob([data], { 
-      type: format === 'json' ? 'application/json' : 'text/csv' 
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `leads_export_${new Date().toISOString().split('T')[0]}.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const data = exportLeads(format);
+      
+      // Para CSV, adicionar BOM UTF-8 para compatibilidade com Excel
+      const blobContent = format === 'csv' 
+        ? '\uFEFF' + data // BOM UTF-8 para Excel
+        : data;
+      
+      const blob = new Blob([blobContent], { 
+        type: format === 'json' 
+          ? 'application/json;charset=utf-8' 
+          : 'text/csv;charset=utf-8'
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads_export_${new Date().toISOString().split('T')[0]}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-    setLastExport(format);
-    toast({
-      title: 'Exportação concluída',
-      description: `${leads.length} leads exportados em formato ${format.toUpperCase()}.`,
-    });
+      setLastExport(format);
+      toast({
+        title: 'Exportação concluída',
+        description: `${leads.length} lead${leads.length !== 1 ? 's' : ''} exportado${leads.length !== 1 ? 's' : ''} em formato ${format.toUpperCase()}.`,
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível exportar os dados. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -57,7 +76,6 @@ export function ExportPanel() {
             <Button 
               onClick={() => handleExport('csv')} 
               className="w-full"
-              disabled={leads.length === 0}
             >
               {lastExport === 'csv' ? (
                 <>
@@ -89,7 +107,6 @@ export function ExportPanel() {
               onClick={() => handleExport('json')} 
               variant="outline"
               className="w-full"
-              disabled={leads.length === 0}
             >
               {lastExport === 'json' ? (
                 <>

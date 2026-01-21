@@ -152,6 +152,7 @@ export function LeadsProvider({ children }: { children: ReactNode }) {
     const exportData = leads.map(lead => ({
       nome: lead.name,
       telefone: lead.phone,
+      email: lead.email || '',
       cidade: lead.city || '',
       estado: lead.state || '',
       area_direito: lead.legalArea || '',
@@ -168,10 +169,20 @@ export function LeadsProvider({ children }: { children: ReactNode }) {
       return JSON.stringify(exportData, null, 2);
     }
 
-    // CSV format
-    const headers = Object.keys(exportData[0] || {}).join(',');
+    // CSV format - Compatível com Excel
+    if (exportData.length === 0) {
+      // Se não há dados, retorna apenas o cabeçalho
+      const headers = ['nome', 'telefone', 'email', 'cidade', 'estado', 'area_direito', 'demanda', 'urgencia', 'status', 'consentimento_lgpd', 'data_consentimento', 'criado_em', 'atualizado_em'];
+      return headers.join(',');
+    }
+
+    const headers = Object.keys(exportData[0]).join(',');
     const rows = exportData.map(row => 
-      Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+      Object.values(row).map(v => {
+        const value = String(v || '');
+        // Escapar aspas duplas e quebras de linha para CSV
+        return `"${value.replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '')}"`;
+      }).join(',')
     );
     return [headers, ...rows].join('\n');
   }, [leads]);
