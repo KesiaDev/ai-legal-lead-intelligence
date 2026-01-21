@@ -4,7 +4,8 @@ import { UserProfileSettings } from './UserProfileSettings';
 import { CompanySettings } from './CompanySettings';
 import { UsersManagement } from './UsersManagement';
 import { NotificationSettings } from './NotificationSettings';
-import { User, Building2, Users, Bell } from 'lucide-react';
+import { IntegrationsSettings } from './IntegrationsSettings';
+import { User, Building2, Users, Bell, Plug } from 'lucide-react';
 
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -21,7 +22,7 @@ export function SettingsView() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="w-4 h-4" />
             Informações Pessoais
@@ -33,6 +34,10 @@ export function SettingsView() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             Usuários
+          </TabsTrigger>
+          <TabsTrigger value="integrations" className="flex items-center gap-2">
+            <Plug className="w-4 h-4" />
+            Integrações
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center gap-2">
             <Bell className="w-4 h-4" />
@@ -50,6 +55,10 @@ export function SettingsView() {
 
         <TabsContent value="users" className="mt-6">
           <UsersManagement />
+        </TabsContent>
+
+        <TabsContent value="integrations" className="mt-6">
+          <IntegrationsSettings />
         </TabsContent>
 
         <TabsContent value="notifications" className="mt-6">
