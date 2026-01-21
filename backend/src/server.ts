@@ -458,6 +458,77 @@ async function build() {
   await registerCrmRoutes(fastify);
 
   // ======================================================
+  // ENDPOINT TEMPORÁRIO: FIX MIGRATION
+  // ⚠️ REMOVER DEPOIS DE APLICAR A MIGRATION
+  // ======================================================
+  fastify.post('/api/fix-migration', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const user = request.user as { id: string; tenantId: string } | undefined;
+      
+      if (!user) {
+        return reply.status(401).send({ error: 'Não autenticado' });
+      }
+
+      const currentUser = await prisma.user.findUnique({
+        where: { id: user.id },
+      });
+
+      if (currentUser?.role !== 'admin') {
+        return reply.status(403).send({ error: 'Apenas administradores podem executar esta ação' });
+      }
+
+      const fs = require('fs');
+      const path = require('path');
+      const sqlPath = path.join(__dirname, '../prisma/migrations/20250120000000_add_pipelines_and_deals/migration_safe.sql');
+      
+      if (!fs.existsSync(sqlPath)) {
+        return reply.status(404).send({ error: 'Arquivo SQL não encontrado' });
+      }
+
+      const sql = fs.readFileSync(sqlPath, 'utf-8');
+      const commands = sql
+        .split(';')
+        .map(cmd => cmd.trim())
+        .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
+
+      const results = [];
+      for (const command of commands) {
+        if (command.length > 0) {
+          try {
+            await prisma.$executeRawUnsafe(command);
+            results.push({ status: 'success', command: command.substring(0, 80) + '...' });
+          } catch (error: any) {
+            if (error.message.includes('already exists') || 
+                error.message.includes('does not exist') ||
+                error.message.includes('duplicate') ||
+                error.message.includes('constraint')) {
+              results.push({ status: 'skipped', command: command.substring(0, 80) + '...', reason: 'already exists' });
+            } else {
+              results.push({ status: 'error', command: command.substring(0, 80) + '...', error: error.message });
+            }
+          }
+        }
+      }
+
+      return reply.send({
+        success: true,
+        message: 'Migration aplicada com sucesso',
+        totalCommands: commands.length,
+        results,
+      });
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao aplicar migration',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // ======================================================
   // GERENCIAMENTO DE TENANTS (CLIENTES)
   // ======================================================
   
