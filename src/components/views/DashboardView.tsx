@@ -3,6 +3,7 @@ import { useLeads } from '@/contexts/LeadsContext';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { LeadsByAreaChart } from '@/components/dashboard/LeadsByAreaChart';
 import { LeadCard } from '@/components/leads/LeadCard';
+import { SalesFunnelView } from '@/components/funnel/SalesFunnelView';
 
 interface DashboardViewProps {
   onSelectLead: (leadId: string) => void;
@@ -96,6 +97,19 @@ export function DashboardView({ onSelectLead }: DashboardViewProps) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Funis de Campanha */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-display font-semibold text-foreground mb-2">
+            Funil de Vendas
+          </h2>
+          <p className="text-muted-foreground">
+            Acompanhe seus negócios através dos funis de campanha
+          </p>
+        </div>
+        <SalesFunnelView />
       </div>
     </div>
   );
