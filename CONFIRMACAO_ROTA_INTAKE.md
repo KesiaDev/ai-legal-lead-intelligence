@@ -34,18 +34,35 @@ await registerIntakeRoute(fastify);
 
 ### **Backend URL (Railway):**
 
-Baseado nos arquivos de configuração:
-- **URL Base:** `https://sdradvogados.up.railway.app`
+**⚠️ IMPORTANTE:** O backend está no serviço **"legal-lead-scout"**, NÃO em "SDR Advogados"!
+
+**Opção 1: Domínio Customizado (se configurado):**
+- **URL Base:** `https://api.sdrjuridico.com.br`
 - **Rota:** `/api/agent/intake`
-- **URL Completa:** `https://sdradvogados.up.railway.app/api/agent/intake`
+- **URL Completa:** `https://api.sdrjuridico.com.br/api/agent/intake`
+- ⚠️ **Verifique se o domínio está apontando para o serviço "legal-lead-scout" (backend)**
+
+**Opção 2: URL Railway Direta:**
+- **URL Base:** `https://legal-lead-scout-production.up.railway.app` (ou similar)
+- **Rota:** `/api/agent/intake`
+- **URL Completa:** `https://legal-lead-scout-production.up.railway.app/api/agent/intake`
+- ✅ **Use esta se não tiver domínio customizado configurado**
 
 ---
 
 ## ✅ URL CORRETA PARA N8N
 
+**Se você tem domínio customizado configurado:**
 ```
-POST https://sdradvogados.up.railway.app/api/agent/intake
+POST https://api.sdrjuridico.com.br/api/agent/intake
 ```
+⚠️ **Verifique se `api.sdrjuridico.com.br` está apontando para o serviço "legal-lead-scout" (backend)**
+
+**Se você NÃO tem domínio customizado:**
+```
+POST https://legal-lead-scout-production.up.railway.app/api/agent/intake
+```
+(Substitua `legal-lead-scout-production.up.railway.app` pela URL real do seu serviço backend no Railway)
 
 **⚠️ IMPORTANTE:**
 - ✅ Usa `/api/agent/intake` (com `/api` no início)
@@ -68,8 +85,10 @@ POST https://sdradvogados.up.railway.app/api/agent/intake
    - Verifique se não há erro no build
 
 3. **URL errada no N8N:**
-   - Verifique se está usando: `https://sdradvogados.up.railway.app/api/agent/intake`
-   - **NÃO** use: `https://api.sdrjuridico.com.br/api/agent/intake` (esse domínio não existe)
+   - Se usar domínio customizado: `https://api.sdrjuridico.com.br/api/agent/intake`
+   - ⚠️ **IMPORTANTE:** Verifique se `api.sdrjuridico.com.br` está apontando para o serviço **"legal-lead-scout"** (backend), NÃO para "SDR Advogados" (frontend)
+   - Se usar URL Railway direta: `https://legal-lead-scout-production.up.railway.app/api/agent/intake`
+   - **NÃO** use: `https://sdradvogados.up.railway.app/api/agent/intake` (esse é o frontend)
 
 4. **Problema de deploy:**
    - O código pode não ter sido deployado
@@ -82,7 +101,11 @@ POST https://sdradvogados.up.railway.app/api/agent/intake
 ### **1. Testar Diretamente (curl ou Postman):**
 
 ```bash
-curl -X POST https://sdradvogados.up.railway.app/api/agent/intake \
+# Se tiver domínio customizado:
+curl -X POST https://api.sdrjuridico.com.br/api/agent/intake \
+
+# OU se usar URL Railway direta:
+curl -X POST https://legal-lead-scout-production.up.railway.app/api/agent/intake \
   -H "Content-Type: application/json" \
   -d '{
     "lead_id": "test-123",
@@ -182,7 +205,9 @@ Content-Type: application/json
 ### **Checklist:**
 
 - [ ] Backend está "Online" no Railway?
-- [ ] URL no N8N está correta: `https://sdradvogados.up.railway.app/api/agent/intake`?
+- [ ] URL no N8N está correta?
+  - Domínio customizado: `https://api.sdrjuridico.com.br/api/agent/intake` (verifique se aponta para backend)
+  - URL Railway: `https://legal-lead-scout-production.up.railway.app/api/agent/intake`
 - [ ] Método é `POST`?
 - [ ] Content-Type é `application/json`?
 - [ ] Body tem `lead_id` e `mensagem`?
@@ -195,7 +220,9 @@ Content-Type: application/json
 
 **✅ Rota confirmada no código:** `/api/agent/intake`
 
-**✅ URL completa:** `https://sdradvogados.up.railway.app/api/agent/intake`
+**✅ URL completa (domínio customizado):** `https://api.sdrjuridico.com.br/api/agent/intake`
+**✅ URL completa (Railway direta):** `https://legal-lead-scout-production.up.railway.app/api/agent/intake`
+**⚠️ IMPORTANTE:** Verifique qual serviço o domínio está apontando no Railway!
 
 **✅ Método:** `POST`
 
