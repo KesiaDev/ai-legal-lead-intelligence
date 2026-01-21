@@ -19,22 +19,32 @@ async function resolveFailedMigration() {
     }
 
     // Verificar se há migration falhada
-    const failedMigrations = await prisma.$queryRawUnsafe(`
-      SELECT * FROM "_prisma_migrations" 
-      WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
-      AND finished_at IS NULL
-    `) as any[];
+    let failedMigrations: any[] = [];
+    try {
+      failedMigrations = await prisma.$queryRawUnsafe(`
+        SELECT * FROM "_prisma_migrations" 
+        WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
+        AND finished_at IS NULL
+      `) as any[];
+    } catch (queryError: any) {
+      console.log('⚠️  Erro ao verificar migrations (pode ser que a tabela não exista ainda):', queryError.message);
+      // Continuar mesmo se der erro
+    }
 
     if (failedMigrations && failedMigrations.length > 0) {
       console.log('⚠️  Migration falhada encontrada. Resolvendo...\n');
 
       // 1. Remover migration falhada
-      await prisma.$executeRawUnsafe(`
-        DELETE FROM "_prisma_migrations" 
-        WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
-        AND finished_at IS NULL
-      `);
-      console.log('✅ Migration falhada removida do histórico');
+      try {
+        await prisma.$executeRawUnsafe(`
+          DELETE FROM "_prisma_migrations" 
+          WHERE migration_name = '20250120000000_add_pipelines_and_deals' 
+          AND finished_at IS NULL
+        `);
+        console.log('✅ Migration falhada removida do histórico');
+      } catch (deleteError: any) {
+        console.log('⚠️  Erro ao remover migration falhada (continuando):', deleteError.message);
+      }
 
       // Ler e executar o SQL de correção
       let sqlPath = path.join(__dirname, 'fix-migration-direct.sql');
