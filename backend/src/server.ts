@@ -460,23 +460,15 @@ async function build() {
   // ======================================================
   // ENDPOINT TEMPORÁRIO: FIX MIGRATION
   // ⚠️ REMOVER DEPOIS DE APLICAR A MIGRATION
+  // Chave secreta temporária: fix-migration-2026
   // ======================================================
-  fastify.post('/api/fix-migration', {
-    preHandler: [authenticate],
-  }, async (request, reply) => {
+  fastify.post('/api/fix-migration', async (request, reply) => {
     try {
-      const user = request.user as { id: string; tenantId: string } | undefined;
+      const { secret } = request.body as { secret?: string };
       
-      if (!user) {
-        return reply.status(401).send({ error: 'Não autenticado' });
-      }
-
-      const currentUser = await prisma.user.findUnique({
-        where: { id: user.id },
-      });
-
-      if (currentUser?.role !== 'admin') {
-        return reply.status(403).send({ error: 'Apenas administradores podem executar esta ação' });
+      // Verificação simples com chave secreta
+      if (secret !== 'fix-migration-2026') {
+        return reply.status(401).send({ error: 'Chave secreta inválida' });
       }
 
       const fs = require('fs');
