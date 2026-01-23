@@ -25,9 +25,35 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const config = await fastify.prisma.agentConfig.findUnique({
-        where: { tenantId },
-      });
+      let config;
+      try {
+        config = await fastify.prisma.agentConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, retornar configurações padrão
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela AgentConfig não existe ainda, retornando padrões');
+          return reply.send({
+            name: 'SDR Jurídico',
+            description: '',
+            isActive: true,
+            communicationConfig: null,
+            followUpConfig: null,
+            scheduleConfig: null,
+            humanizationConfig: null,
+            knowledgeBase: null,
+            intentions: null,
+            templates: null,
+            funnelStages: null,
+            lawyers: null,
+            rotationRules: null,
+            reminders: null,
+            eventConfig: null,
+          });
+        }
+        throw dbError;
+      }
 
       if (!config) {
         // Retornar configurações padrão se não existir
@@ -112,9 +138,20 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
       };
 
       // Verificar se já existe configuração
-      const existing = await fastify.prisma.agentConfig.findUnique({
-        where: { tenantId },
-      });
+      let existing = null;
+      try {
+        existing = await fastify.prisma.agentConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, criar a primeira vez
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          fastify.log.warn({ tenantId, dbError: dbError.message }, 'Tabela AgentConfig não encontrada ao tentar atualizar/criar. Assumindo que não existe.');
+          existing = null;
+        } else {
+          throw dbError;
+        }
+      }
 
       let config;
       if (existing) {
