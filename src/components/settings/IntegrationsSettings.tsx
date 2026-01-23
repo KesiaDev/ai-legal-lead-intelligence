@@ -16,6 +16,9 @@ interface IntegrationConfig {
   evolutionApiUrl?: string;
   evolutionApiKey?: string;
   evolutionInstance?: string;
+  zapiInstanceId?: string;
+  zapiToken?: string;
+  zapiBaseUrl?: string;
 }
 
 export function IntegrationsSettings() {
@@ -28,6 +31,9 @@ export function IntegrationsSettings() {
     evolutionApiUrl: '',
     evolutionApiKey: '',
     evolutionInstance: '',
+    zapiInstanceId: '',
+    zapiToken: '',
+    zapiBaseUrl: 'https://api.z-api.io',
   });
 
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
@@ -71,7 +77,7 @@ export function IntegrationsSettings() {
     }
   };
 
-  const testConnection = async (type: 'openai' | 'n8n' | 'evolution') => {
+  const testConnection = async (type: 'openai' | 'n8n' | 'evolution' | 'zapi') => {
     setTestResults({ ...testResults, [type]: 'pending' });
 
     try {
@@ -130,6 +136,23 @@ export function IntegrationsSettings() {
         } else {
           throw new Error('Falha na conexão');
         }
+      } else if (type === 'zapi' && formData.zapiInstanceId && formData.zapiToken) {
+        // Testar Z-API
+        const baseUrl = formData.zapiBaseUrl || 'https://api.z-api.io';
+        const response = await fetch(`${baseUrl}/instances/${formData.zapiInstanceId}/token/${formData.zapiToken}/status`, {
+          method: 'GET',
+        });
+        
+        if (response.ok || response.status === 200) {
+          setTestResults({ ...testResults, zapi: 'success' });
+          toast({
+            title: 'Conexão bem-sucedida!',
+            description: 'Z-API está funcionando corretamente.',
+            variant: 'default',
+          });
+        } else {
+          throw new Error('Falha na conexão');
+        }
       }
     } catch (err: any) {
       setTestResults({ ...testResults, [type]: 'error' });
@@ -144,10 +167,11 @@ export function IntegrationsSettings() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="openai" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="openai">OpenAI</TabsTrigger>
           <TabsTrigger value="n8n">N8N</TabsTrigger>
           <TabsTrigger value="evolution">Evolution API</TabsTrigger>
+          <TabsTrigger value="zapi">Z-API</TabsTrigger>
         </TabsList>
 
         {/* OpenAI Integration */}
@@ -400,6 +424,112 @@ export function IntegrationsSettings() {
                         <li>Configure a Evolution API diretamente no seu workflow N8N</li>
                         <li>Se você usa Evolution compartilhada, não precisa preencher aqui</li>
                         <li>Se cada cliente tem Evolution própria, eles te passam as credenciais e você configura no N8N</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Z-API Integration */}
+        <TabsContent value="zapi" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="w-5 h-5" />
+                    Z-API (WhatsApp)
+                  </CardTitle>
+                  <CardDescription className="mt-2">
+                    Configure sua Z-API para envio e recebimento de mensagens via WhatsApp.
+                  </CardDescription>
+                </div>
+                {testResults.zapi === 'success' && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Conectado
+                  </Badge>
+                )}
+                {testResults.zapi === 'error' && (
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    <XCircle className="w-3 h-3 mr-1" />
+                    Erro
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="zapi-instance-id">ID da Instância</Label>
+                  <Input
+                    id="zapi-instance-id"
+                    placeholder="3EDAA0991A2272AFA1183EBEF7B316F4"
+                    value={formData.zapiInstanceId || ''}
+                    onChange={(e) => setFormData({ ...formData, zapiInstanceId: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    ID da instância do Z-API (encontre em: Dados da instância web).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zapi-token">Token da Instância</Label>
+                  <Input
+                    id="zapi-token"
+                    type="password"
+                    placeholder="147E1F8CFCAACFFE1799DFAE"
+                    value={formData.zapiToken || ''}
+                    onChange={(e) => setFormData({ ...formData, zapiToken: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token da instância do Z-API (encontre em: Dados da instância web).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="zapi-base-url">URL Base (Opcional)</Label>
+                  <Input
+                    id="zapi-base-url"
+                    type="url"
+                    placeholder="https://api.z-api.io"
+                    value={formData.zapiBaseUrl || 'https://api.z-api.io'}
+                    onChange={(e) => setFormData({ ...formData, zapiBaseUrl: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    URL base da API Z-API (padrão: https://api.z-api.io).
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => testConnection('zapi')}
+                    disabled={!formData.zapiInstanceId || !formData.zapiToken || isLoading}
+                  >
+                    Testar Conexão
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {isLoading ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
+                    <div className="text-sm text-blue-900">
+                      <p className="font-medium mb-1">Como funciona:</p>
+                      <ul className="list-disc list-inside space-y-1 text-blue-800">
+                        <li>Z-API recebe mensagens do WhatsApp e envia webhook para a plataforma</li>
+                        <li>Plataforma processa mensagem com agente IA</li>
+                        <li>Agente responde via Z-API automaticamente</li>
+                        <li>Configure o webhook no Z-API: <strong>https://api.sdrjuridico.com.br/api/webhooks/zapi</strong></li>
+                        <li>Configure as variáveis no Railway: ZAPI_INSTANCE_ID, ZAPI_TOKEN</li>
                       </ul>
                     </div>
                   </div>
