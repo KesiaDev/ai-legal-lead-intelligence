@@ -669,16 +669,67 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addKnowledgeItem = (item: KnowledgeBaseItem) => {
-    setKnowledgeBase(prev => [...prev, item]);
+  const addKnowledgeItem = async (item: KnowledgeBaseItem) => {
+    const newBase = [...knowledgeBase, item];
+    setKnowledgeBase(newBase);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ knowledgeBase: newBase }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar base de conhecimento:', error);
+    }
   };
 
-  const updateKnowledgeItem = (id: string, updates: Partial<KnowledgeBaseItem>) => {
-    setKnowledgeBase(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  const updateKnowledgeItem = async (id: string, updates: Partial<KnowledgeBaseItem>) => {
+    const newBase = knowledgeBase.map(item => item.id === id ? { ...item, ...updates } : item);
+    setKnowledgeBase(newBase);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ knowledgeBase: newBase }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar base de conhecimento:', error);
+    }
   };
 
-  const removeKnowledgeItem = (id: string) => {
-    setKnowledgeBase(prev => prev.filter(item => item.id !== id));
+  const removeKnowledgeItem = async (id: string) => {
+    const newBase = knowledgeBase.filter(item => item.id !== id);
+    setKnowledgeBase(newBase);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ knowledgeBase: newBase }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar base de conhecimento:', error);
+    }
   };
 
   const updateFollowUpConfig = async (updates: Partial<FollowUpConfig>) => {
