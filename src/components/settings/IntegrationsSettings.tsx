@@ -221,16 +221,36 @@ export function IntegrationsSettings() {
       
       if (data.success) {
         // Mostrar resultados no console
-        console.log('✅ Migration aplicada com sucesso!', data.results);
+        console.log('✅ Migration aplicada!', data.results);
         
         // Contar quantas migrations foram aplicadas
         const successCount = data.results?.filter((r: any) => r.status === 'success').length || 0;
         const errorCount = data.results?.filter((r: any) => r.status === 'error').length || 0;
+        const skippedCount = data.results?.filter((r: any) => r.status === 'skipped').length || 0;
+        
+        // Mostrar detalhes no console
+        console.log(`📊 Resultados: ${successCount} sucesso, ${skippedCount} pulados, ${errorCount} erros`);
+        if (errorCount > 0) {
+          const errors = data.results?.filter((r: any) => r.status === 'error');
+          console.error('❌ Erros encontrados:', errors);
+        }
+        
+        let description = '';
+        if (successCount > 0) {
+          description = `✅ ${successCount} comando(s) executado(s) com sucesso. `;
+        }
+        if (skippedCount > 0) {
+          description += `⏭️ ${skippedCount} comando(s) já existiam (pulados). `;
+        }
+        if (errorCount > 0) {
+          description += `❌ ${errorCount} erro(s). Veja o console (F12) para detalhes. `;
+        }
+        description += 'Recarregue a página manualmente (F5).';
         
         toast({
-          title: '✅ Migration aplicada!',
-          description: `${successCount} tabela(s) criada(s) com sucesso. ${errorCount > 0 ? `${errorCount} erro(s).` : ''} Recarregue a página manualmente (F5).`,
-          variant: 'default',
+          title: successCount > 0 || skippedCount > 0 ? '✅ Migration aplicada!' : '⚠️ Migration com problemas',
+          description: description,
+          variant: errorCount > 0 && successCount === 0 ? 'destructive' : 'default',
         });
         
         // Não recarregar automaticamente - deixar o usuário recarregar manualmente
