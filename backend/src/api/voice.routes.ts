@@ -28,9 +28,36 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const voiceConfig = await prisma.voiceConfig.findUnique({
-        where: { tenantId },
-      });
+      let voiceConfig;
+      try {
+        voiceConfig = await prisma.voiceConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, retornar configuração padrão
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela VoiceConfig não existe ainda, retornando padrões');
+          return reply.status(200).send({
+            config: {
+              provider: 'elevenlabs',
+              voiceId: 'EXAVITQu4vr4xnSDxMaL',
+              voiceName: 'Sarah - Profissional Feminina',
+              audioResponseProbabilityOnText: 'nunca',
+              audioResponseProbabilityOnAudio: 'alta',
+              audioResponseProbabilityOnMedia: 'baixa',
+              maxAudioDuration: 60,
+              textToSpeechAdjustment: 'moderado',
+              textOnlyKeywords: [],
+              voiceStability: 0.5,
+              voiceSimilarityBoost: 0.75,
+              voiceStyle: 0.3,
+              voiceSpeed: 1.0,
+              enabled: false,
+            },
+          });
+        }
+        throw dbError;
+      }
 
       if (!voiceConfig) {
         // Retornar configuração padrão
@@ -119,9 +146,20 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
       };
 
       // Verificar se já existe
-      const existing = await prisma.voiceConfig.findUnique({
-        where: { tenantId },
-      });
+      let existing = null;
+      try {
+        existing = await prisma.voiceConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, criar a primeira vez
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela VoiceConfig não existe ainda, criando...');
+          existing = null;
+        } else {
+          throw dbError;
+        }
+      }
 
       if (existing) {
         // Atualizar

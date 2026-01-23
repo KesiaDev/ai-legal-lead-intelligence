@@ -268,30 +268,40 @@ Responda APENAS em formato JSON conforme o schema:
 
     // Buscar do banco se tiver tenantId
     if (tenantId) {
-      const dbPrompts = await this.prisma.agentPrompt.findMany({
-        where: {
-          tenantId,
-          status: 'ativo',
-        },
-        orderBy: [
-          { type: 'asc' },
-          { version: 'desc' },
-        ],
-      });
-
-      for (const dbPrompt of dbPrompts) {
-        prompts.push({
-          id: dbPrompt.id,
-          name: dbPrompt.name,
-          type: dbPrompt.type,
-          version: dbPrompt.version,
-          status: dbPrompt.status as 'ativo' | 'inativo',
-          provider: dbPrompt.provider as 'OpenAI' | 'Google',
-          model: dbPrompt.model,
-          content: dbPrompt.content,
-          temperature: dbPrompt.temperature ?? undefined,
-          maxTokens: dbPrompt.maxTokens ?? undefined,
+      try {
+        const dbPrompts = await this.prisma.agentPrompt.findMany({
+          where: {
+            tenantId,
+            status: 'ativo',
+          },
+          orderBy: [
+            { type: 'asc' },
+            { version: 'desc' },
+          ],
         });
+
+        for (const dbPrompt of dbPrompts) {
+          prompts.push({
+            id: dbPrompt.id,
+            name: dbPrompt.name,
+            type: dbPrompt.type,
+            version: dbPrompt.version,
+            status: dbPrompt.status as 'ativo' | 'inativo',
+            provider: dbPrompt.provider as 'OpenAI' | 'Google',
+            model: dbPrompt.model,
+            content: dbPrompt.content,
+            temperature: dbPrompt.temperature ?? undefined,
+            maxTokens: dbPrompt.maxTokens ?? undefined,
+          });
+        }
+      } catch (dbError: any) {
+        // Se a tabela não existir, usar apenas prompts padrão
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          this.fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela AgentPrompt não existe ainda, usando apenas prompts padrão');
+        } else {
+          // Outros erros, logar mas continuar com prompts padrão
+          this.fastify.log.error({ error: dbError, tenantId }, 'Erro ao buscar prompts do banco, usando padrões');
+        }
       }
     }
 
