@@ -28,42 +28,19 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         });
       }
 
-      let voiceConfig;
-      try {
-        voiceConfig = await prisma.voiceConfig.findUnique({
-          where: { tenantId },
-        });
-      } catch (dbError: any) {
-        // Se a tabela não existir, retornar configuração padrão
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
-          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela VoiceConfig não existe ainda, retornando padrões');
-          return reply.status(200).send({
-            config: {
-              provider: 'elevenlabs',
-              voiceId: 'EXAVITQu4vr4xnSDxMaL',
-              voiceName: 'Sarah - Profissional Feminina',
-              audioResponseProbabilityOnText: 'nunca',
-              audioResponseProbabilityOnAudio: 'alta',
-              audioResponseProbabilityOnMedia: 'baixa',
-              maxAudioDuration: 60,
-              textToSpeechAdjustment: 'moderado',
-              textOnlyKeywords: [],
-              voiceStability: 0.5,
-              voiceSimilarityBoost: 0.75,
-              voiceStyle: 0.3,
-              voiceSpeed: 1.0,
-              enabled: false,
-            },
-          });
-        }
-        throw dbError;
-      }
+      // Buscar configuração existente
+      let voiceConfig = await prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
 
+      // Se não existir, criar automaticamente com valores default
       if (!voiceConfig) {
-        // Retornar configuração padrão
-        return reply.status(200).send({
-          config: {
+        fastify.log.info({ tenantId }, 'Criando VoiceConfig automaticamente para o tenant');
+        voiceConfig = await prisma.voiceConfig.create({
+          data: {
+            tenantId,
             provider: 'elevenlabs',
+            elevenlabsApiKey: null,
             voiceId: 'EXAVITQu4vr4xnSDxMaL',
             voiceName: 'Sarah - Profissional Feminina',
             audioResponseProbabilityOnText: 'nunca',
