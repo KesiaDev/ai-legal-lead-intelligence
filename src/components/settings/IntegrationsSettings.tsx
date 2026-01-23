@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Save, Key, Webhook, Database, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Save, Key, Webhook, Database, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,6 +38,7 @@ export function IntegrationsSettings() {
 
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<number | null>(null);
+  const [isApplyingMigration, setIsApplyingMigration] = useState(false);
 
   useEffect(() => {
     // Só carregar se o usuário estiver autenticado
@@ -186,6 +187,41 @@ export function IntegrationsSettings() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const applyMigration = async () => {
+    setIsApplyingMigration(true);
+    try {
+      const response = await fetch('https://api.sdrjuridico.com.br/api/apply-migrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: 'fix-migration-2026' }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        toast({
+          title: '✅ Migration aplicada!',
+          description: 'A tabela foi criada com sucesso. Recarregue a página.',
+          variant: 'default',
+        });
+        // Recarregar após 2 segundos
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        throw new Error(data.error || 'Erro ao aplicar migration');
+      }
+    } catch (err: any) {
+      toast({
+        title: '❌ Erro ao aplicar migration',
+        description: err.message || 'Não foi possível aplicar a migration. Verifique os logs.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsApplyingMigration(false);
     }
   };
 
