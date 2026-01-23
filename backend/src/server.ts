@@ -451,6 +451,7 @@ async function build() {
   await registerIntakeRoute(fastify);
   await registerConversationRoute(fastify);
   await registerWhatsAppRoutes(fastify);
+  await registerZApiRoutes(fastify);
 
   // ======================================================
   // PIPELINES E DEALS
