@@ -114,10 +114,25 @@ export function IntegrationsSettings() {
       });
     } catch (err: any) {
       console.error('Erro completo ao salvar:', err);
-      const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.error || 
-                          err.message || 
-                          'Não foi possível salvar as alterações. Verifique se está autenticado.';
+      
+      // Tratar diferentes tipos de erro
+      let errorMessage = 'Não foi possível salvar as alterações.';
+      
+      if (err.response) {
+        // Erro do servidor
+        if (err.response.status === 500) {
+          errorMessage = 'Erro no servidor. A migration pode não ter sido aplicada ainda. Aguarde alguns minutos e tente novamente.';
+        } else if (err.response.status === 401) {
+          errorMessage = 'Não autenticado. Faça logout e login novamente.';
+        } else {
+          errorMessage = err.response?.data?.message || 
+                        err.response?.data?.error || 
+                        err.message || 
+                        errorMessage;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       
       toast({
         title: 'Erro ao salvar configurações',

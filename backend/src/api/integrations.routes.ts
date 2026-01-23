@@ -25,9 +25,28 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const config = await fastify.prisma.integrationConfig.findUnique({
-        where: { tenantId },
-      });
+      let config;
+      try {
+        config = await fastify.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, retornar null (migration não aplicada)
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01') {
+          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não existe ainda');
+          return reply.send({
+            openaiApiKey: null,
+            n8nWebhookUrl: null,
+            evolutionApiUrl: null,
+            evolutionApiKey: null,
+            evolutionInstance: null,
+            zapiInstanceId: null,
+            zapiToken: null,
+            zapiBaseUrl: null,
+          });
+        }
+        throw dbError;
+      }
 
       // Não retornar API keys completas por segurança (apenas indicar se existe)
       return reply.send({
@@ -78,9 +97,20 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       };
 
       // Verificar se já existe configuração
-      const existing = await fastify.prisma.integrationConfig.findUnique({
-        where: { tenantId },
-      });
+      let existing;
+      try {
+        existing = await fastify.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se a tabela não existir, criar a primeira vez
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01') {
+          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não existe ainda, criando...');
+          existing = null;
+        } else {
+          throw dbError;
+        }
+      }
 
       let config;
       if (existing) {
