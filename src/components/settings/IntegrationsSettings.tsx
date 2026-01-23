@@ -37,8 +37,14 @@ export function IntegrationsSettings() {
   });
 
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
+  const [autoSaveTimeout, setAutoSaveTimeout] = useState<number | null>(null);
 
   useEffect(() => {
+    // Só carregar se o usuário estiver autenticado
+    if (!user) {
+      return;
+    }
+
     // Carregar configurações do backend
     const loadConfig = async () => {
       try {
@@ -85,6 +91,13 @@ export function IntegrationsSettings() {
     };
 
     loadConfig();
+    
+    // Cleanup: limpar timeout ao desmontar
+    return () => {
+      if (autoSaveTimeout) {
+        clearTimeout(autoSaveTimeout);
+      }
+    };
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
