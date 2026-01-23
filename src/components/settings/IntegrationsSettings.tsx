@@ -193,6 +193,12 @@ export function IntegrationsSettings() {
   const applyMigration = async () => {
     setIsApplyingMigration(true);
     try {
+      toast({
+        title: '⏳ Aplicando migration...',
+        description: 'Aguarde, isso pode levar alguns segundos.',
+        variant: 'default',
+      });
+
       const response = await fetch('https://api.sdrjuridico.com.br/api/apply-migrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,15 +220,21 @@ export function IntegrationsSettings() {
       }
       
       if (data.success) {
+        // Mostrar resultados no console
+        console.log('✅ Migration aplicada com sucesso!', data.results);
+        
+        // Contar quantas migrations foram aplicadas
+        const successCount = data.results?.filter((r: any) => r.status === 'success').length || 0;
+        const errorCount = data.results?.filter((r: any) => r.status === 'error').length || 0;
+        
         toast({
           title: '✅ Migration aplicada!',
-          description: 'A tabela foi criada com sucesso. Recarregando a página...',
+          description: `${successCount} tabela(s) criada(s) com sucesso. ${errorCount > 0 ? `${errorCount} erro(s).` : ''} Recarregue a página manualmente (F5).`,
           variant: 'default',
         });
-        // Recarregar após 2 segundos
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+        
+        // Não recarregar automaticamente - deixar o usuário recarregar manualmente
+        // Isso dá tempo para ver a mensagem e entender o que aconteceu
       } else {
         throw new Error(data.error || data.message || 'Erro ao aplicar migration');
       }
