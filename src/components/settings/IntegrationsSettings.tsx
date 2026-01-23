@@ -22,7 +22,7 @@ interface IntegrationConfig {
 }
 
 export function IntegrationsSettings() {
-  const { tenant, refreshTenant } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<IntegrationConfig>({
@@ -39,11 +39,6 @@ export function IntegrationsSettings() {
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
 
   useEffect(() => {
-    // Só carregar se o usuário estiver autenticado
-    if (!user) {
-      return;
-    }
-
     // Carregar configurações do backend
     const loadConfig = async () => {
       try {
