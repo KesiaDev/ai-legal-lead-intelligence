@@ -137,28 +137,53 @@ export function IntegrationsSettings() {
           throw new Error('Falha na conexão');
         }
       } else if (type === 'zapi' && formData.zapiInstanceId && formData.zapiToken) {
-        // Testar Z-API
-        const baseUrl = formData.zapiBaseUrl || 'https://api.z-api.io';
-        const response = await fetch(`${baseUrl}/instances/${formData.zapiInstanceId}/token/${formData.zapiToken}/status`, {
-          method: 'GET',
-        });
-        
-        if (response.ok || response.status === 200) {
-          setTestResults({ ...testResults, zapi: 'success' });
-          toast({
-            title: 'Conexão bem-sucedida!',
-            description: 'Z-API está funcionando corretamente.',
-            variant: 'default',
+        // Testar Z-API via backend
+        try {
+          const response = await api.post('/api/zapi/test-connection', {
+            instanceId: formData.zapiInstanceId,
+            token: formData.zapiToken,
+            baseUrl: formData.zapiBaseUrl || 'https://api.z-api.io',
           });
-        } else {
-          throw new Error('Falha na conexão');
+          
+          if (response.data.success) {
+            setTestResults({ ...testResults, zapi: 'success' });
+            toast({
+              title: 'Conexão bem-sucedida!',
+              description: 'Z-API está funcionando corretamente.',
+              variant: 'default',
+            });
+          } else {
+            throw new Error(response.data.message || response.data.error || 'Falha na conexão');
+          }
+        } catch (apiErr: any) {
+          // Tratar erros específicos da API
+          const errorMessage = apiErr.response?.data?.message || 
+                              apiErr.response?.data?.error || 
+                              apiErr.message || 
+                              'Não foi possível conectar. Verifique as credenciais.';
+          
+          throw new Error(errorMessage);
         }
       }
     } catch (err: any) {
       setTestResults({ ...testResults, [type]: 'error' });
+      
+      // Mensagem de erro mais específica
+      let errorDescription = err.message || 'Não foi possível conectar. Verifique as credenciais.';
+      
+      // Se for erro 401, credenciais inválidas
+      if (err.response?.status === 401 || err.message?.includes('inválid')) {
+        errorDescription = 'Credenciais inválidas. Verifique o ID da Instância e o Token no painel do Z-API.';
+      }
+      
+      // Se for erro 404, endpoint não encontrado (deploy pendente)
+      if (err.response?.status === 404) {
+        errorDescription = 'Endpoint não encontrado. Aguarde o deploy do backend ou verifique a URL da API.';
+      }
+      
       toast({
         title: 'Erro ao testar conexão',
-        description: err.message || 'Não foi possível conectar. Verifique as credenciais.',
+        description: errorDescription,
         variant: 'destructive',
       });
     }
