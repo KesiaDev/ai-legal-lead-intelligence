@@ -15,15 +15,28 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate],
   }, async (request: any, reply: any) => {
     try {
-      const user = request.user as { id: string; tenantId: string } | undefined;
-      const tenantId = user?.tenantId;
+      // Validação obrigatória de tenantId ANTES de qualquer chamada Prisma
+      const tenantId = request.user?.tenantId;
 
       if (!tenantId) {
+        request.log.error({
+          user: request.user,
+          headers: request.headers,
+          route: request.routerPath,
+        }, 'TenantId ausente no request - GET /api/integrations');
+
         return reply.status(401).send({
-          error: 'Não autenticado',
-          message: 'Token de autenticação inválido',
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
         });
       }
+
+      // Log de diagnóstico
+      request.log.info({
+        tenantId,
+        userId: request.user?.id,
+        route: request.routerPath,
+      }, 'Config endpoint access - GET /api/integrations');
 
       // Buscar configuração existente
       let config = await fastify.prisma.integrationConfig.findUnique({
@@ -75,15 +88,28 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate],
   }, async (request: any, reply: any) => {
     try {
-      const user = request.user as { id: string; tenantId: string } | undefined;
-      const tenantId = user?.tenantId;
+      // Validação obrigatória de tenantId ANTES de qualquer chamada Prisma
+      const tenantId = request.user?.tenantId;
 
       if (!tenantId) {
+        request.log.error({
+          user: request.user,
+          headers: request.headers,
+          route: request.routerPath,
+        }, 'TenantId ausente no request - PATCH /api/integrations');
+
         return reply.status(401).send({
-          error: 'Não autenticado',
-          message: 'Token de autenticação inválido',
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
         });
       }
+
+      // Log de diagnóstico
+      request.log.info({
+        tenantId,
+        userId: request.user?.id,
+        route: request.routerPath,
+      }, 'Config endpoint access - PATCH /api/integrations');
 
       const body = request.body as {
         openaiApiKey?: string;

@@ -44,6 +44,19 @@ export async function authenticate(
     // Verifica e decodifica o token
     const decoded = request.server.jwt.verify<JWTPayload>(token);
 
+    // Validar que tenantId está presente no token
+    if (!decoded.tenantId) {
+      request.log.error({
+        decoded,
+        token: token.substring(0, 20) + '...',
+      }, 'Token JWT sem tenantId');
+      
+      return reply.status(401).send({
+        error: 'Token inválido',
+        message: 'Token não contém tenantId. Faça login novamente.',
+      });
+    }
+
     // Adiciona user ao request
     request.user = {
       id: decoded.id,
