@@ -906,65 +906,303 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   };
 
   // Templates
-  const addTemplate = (template: MessageTemplate) => {
-    setTemplates(prev => [...prev, template]);
+  const addTemplate = async (template: MessageTemplate) => {
+    const newTemplates = [...templates, template];
+    setTemplates(newTemplates);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ templates: newTemplates }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar templates:', error);
+    }
   };
 
-  const updateTemplate = (id: string, updates: Partial<MessageTemplate>) => {
-    setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+  const updateTemplate = async (id: string, updates: Partial<MessageTemplate>) => {
+    const newTemplates = templates.map(t => t.id === id ? { ...t, ...updates } : t);
+    setTemplates(newTemplates);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ templates: newTemplates }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar templates:', error);
+    }
   };
 
-  const deleteTemplate = (id: string) => {
-    setTemplates(prev => prev.filter(t => t.id !== id));
+  const deleteTemplate = async (id: string) => {
+    const newTemplates = templates.filter(t => t.id !== id);
+    setTemplates(newTemplates);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ templates: newTemplates }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar templates:', error);
+    }
   };
 
   // Funnel
-  const updateFunnelStage = (id: string, updates: Partial<FunnelStage>) => {
-    setFunnelStages(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  const updateFunnelStage = async (id: string, updates: Partial<FunnelStage>) => {
+    const newStages = funnelStages.map(s => s.id === id ? { ...s, ...updates } : s);
+    setFunnelStages(newStages);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ funnelStages: newStages }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar funnel stages:', error);
+    }
   };
 
-  const addFunnelStage = (stage: FunnelStage) => {
-    setFunnelStages(prev => [...prev, stage]);
+  const addFunnelStage = async (stage: FunnelStage) => {
+    const newStages = [...funnelStages, stage];
+    setFunnelStages(newStages);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ funnelStages: newStages }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar funnel stages:', error);
+    }
   };
 
-  const deleteFunnelStage = (id: string) => {
-    setFunnelStages(prev => prev.filter(s => s.id !== id));
+  const deleteFunnelStage = async (id: string) => {
+    const newStages = funnelStages.filter(s => s.id !== id);
+    setFunnelStages(newStages);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ funnelStages: newStages }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar funnel stages:', error);
+    }
   };
 
   // Lawyers
-  const addLawyer = (lawyer: Lawyer) => {
-    setLawyers(prev => [...prev, lawyer]);
+  const addLawyer = async (lawyer: Lawyer) => {
+    const newLawyers = [...lawyers, lawyer];
+    setLawyers(newLawyers);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lawyers: newLawyers }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar lawyers:', error);
+    }
   };
 
-  const updateLawyer = (id: string, updates: Partial<Lawyer>) => {
-    setLawyers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l));
+  const updateLawyer = async (id: string, updates: Partial<Lawyer>) => {
+    const newLawyers = lawyers.map(l => l.id === id ? { ...l, ...updates } : l);
+    setLawyers(newLawyers);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lawyers: newLawyers }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar lawyers:', error);
+    }
   };
 
-  const deleteLawyer = (id: string) => {
-    setLawyers(prev => prev.filter(l => l.id !== id));
+  const deleteLawyer = async (id: string) => {
+    const newLawyers = lawyers.filter(l => l.id !== id);
+    setLawyers(newLawyers);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lawyers: newLawyers }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar lawyers:', error);
+    }
   };
 
   // Rotation Rules
-  const updateRotationRule = (id: string, updates: Partial<RotationRule>) => {
-    setRotationRules(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  const updateRotationRule = async (id: string, updates: Partial<RotationRule>) => {
+    const newRules = rotationRules.map(r => r.id === id ? { ...r, ...updates } : r);
+    setRotationRules(newRules);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ rotationRules: newRules }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar rotation rules:', error);
+    }
   };
 
   // Reminders
-  const updateReminder = (id: string, updates: Partial<ReminderConfig>) => {
-    setReminders(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  const updateReminder = async (id: string, updates: Partial<ReminderConfig>) => {
+    const newReminders = reminders.map(r => r.id === id ? { ...r, ...updates } : r);
+    setReminders(newReminders);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reminders: newReminders }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar reminders:', error);
+    }
   };
 
-  const addReminder = (reminder: ReminderConfig) => {
-    setReminders(prev => [...prev, reminder]);
+  const addReminder = async (reminder: ReminderConfig) => {
+    const newReminders = [...reminders, reminder];
+    setReminders(newReminders);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reminders: newReminders }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar reminders:', error);
+    }
   };
 
-  const deleteReminder = (id: string) => {
-    setReminders(prev => prev.filter(r => r.id !== id));
+  const deleteReminder = async (id: string) => {
+    const newReminders = reminders.filter(r => r.id !== id);
+    setReminders(newReminders);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reminders: newReminders }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar reminders:', error);
+    }
   };
 
   // Event Config
-  const updateEventConfig = (updates: Partial<EventConfig>) => {
-    setEventConfig(prev => ({ ...prev, ...updates }));
+  const updateEventConfig = async (updates: Partial<EventConfig>) => {
+    const newConfig = { ...eventConfig, ...updates };
+    setEventConfig(newConfig);
+    
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ eventConfig: newConfig }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar event config:', error);
+    }
   };
 
   return (
