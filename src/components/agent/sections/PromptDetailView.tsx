@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { ArrowLeft, Calendar, FileText, Settings, Code, Clock, CheckCircle2, ExternalLink, Plus, X, MessageSquare, Maximize2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Settings, Code, Clock, CheckCircle2, ExternalLink, Plus, X, MessageSquare, Maximize2, Pencil, FileCode } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PromptDetailViewProps {
@@ -55,7 +55,7 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
     mainModel: prompt.model,
     fallbackProvider: 'Google' as 'OpenAI' | 'Google',
     fallbackModel: 'gemini-2.5-pro',
-    temperature: 0.1,
+    temperature: 0.5,
     maxTokens: 512,
     topP: 1.0,
     frequencyPenalty: 0.0,
@@ -143,7 +143,7 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
                 Informações Básicas
               </TabsTrigger>
               <TabsTrigger value="content" className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
+                <Pencil className="w-4 h-4" />
                 Conteúdo
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
                 Configurações
               </TabsTrigger>
               <TabsTrigger value="schema" className="flex items-center gap-2">
-                <Code className="w-4 h-4" />
+                <FileCode className="w-4 h-4" />
                 JSON Schema
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
@@ -165,7 +165,7 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
             <TabsContent value="basic" className="space-y-4 mt-0">
               <div>
                 <h3 className="text-lg font-semibold mb-2">Informações Básicas</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-6">
                   Configure as informações principais do prompt
                 </p>
               </div>
@@ -315,13 +315,16 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
 
             {/* Configurações */}
             <TabsContent value="settings" className="space-y-6 mt-0">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Modelo e Provedor</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Configure o modelo de IA principal e o fallback
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              {/* Seção: Modelo e Provedor */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Modelo e Provedor</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Configure o modelo de IA principal e o fallback
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Provedor Principal *</Label>
                   <Select
@@ -398,14 +401,20 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-4">Parâmetros de Geração</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Ajuste os parâmetros de geração do modelo
-                </p>
-                <div className="space-y-6">
+              {/* Seção: Parâmetros de Geração */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Parâmetros de Geração</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Ajuste os parâmetros de geração do modelo
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Temperature: {promptConfig.temperature.toFixed(2)}</Label>
@@ -486,8 +495,9 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
                     />
                     <p className="text-xs text-muted-foreground">Incentiva novos tópicos (somente leitura)</p>
                   </div>
-                </div>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* JSON Schema */}
@@ -582,13 +592,18 @@ export function PromptDetailView({ prompt, onBack, onSave, isReadOnly = true }: 
                             {version <= 3 && <Badge variant="secondary" className="text-xs">Conteúdo</Badge>}
                             {version <= 2 && <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">Parâmetros</Badge>}
                           </div>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="outline" size="sm" className="flex items-center gap-2">
+                            <FileText className="w-3 h-3" />
+                            Conteúdo
+                          </Button>
+                          <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                            <Maximize2 className="w-3 h-3" />
                             Comparar
                           </Button>
                         </div>
                       </div>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        Modelo: {version <= 2 ? 'gpt-4.1' : 'gpt-4.1-mini'}, Provider: OpenAI, Temp: {version <= 2 ? '1.0' : version === 3 ? '0.2' : '0.1'}, Max Tokens: {version <= 2 ? '1024' : '512'}
+                        Modelo: {version <= 2 ? 'gpt-4.1' : 'gpt-4.1-mini'}, Provider: OpenAI, Temp: {version <= 2 ? '1.0' : version === 3 ? '0.2' : '0.5'}, Max Tokens: {version <= 2 ? '1024' : '512'}
                       </div>
                     </CardContent>
                   </Card>

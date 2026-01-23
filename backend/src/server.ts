@@ -11,6 +11,7 @@ import { registerIntakeRoute } from './api/agent/intake';
 import { registerConversationRoute } from './api/agent/conversation';
 import { registerPipelineRoutes } from './api/pipelines/routes';
 import { registerCrmRoutes } from './api/crm/routes';
+import { registerWhatsAppRoutes } from './api/whatsapp.routes';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
@@ -446,6 +447,7 @@ async function build() {
   // ======================================================
   await registerIntakeRoute(fastify);
   await registerConversationRoute(fastify);
+  await registerWhatsAppRoutes(fastify);
 
   // ======================================================
   // PIPELINES E DEALS
