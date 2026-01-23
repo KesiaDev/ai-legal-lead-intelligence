@@ -12,6 +12,7 @@ import { registerConversationRoute } from './api/agent/conversation';
 import { registerPipelineRoutes } from './api/pipelines/routes';
 import { registerCrmRoutes } from './api/crm/routes';
 import { registerWhatsAppRoutes } from './api/whatsapp.routes';
+import { registerZApiRoutes } from './api/zapi.routes';
 import { registerPromptsRoutes } from './api/prompts.routes';
 import { registerVoiceRoutes } from './api/voice.routes';
 import { classifyLead } from './services/leadClassifier';
