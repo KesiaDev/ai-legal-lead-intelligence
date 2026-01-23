@@ -27,18 +27,23 @@ export function AgentConfigSection() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [is24_7, setIs24_7] = useState(false);
-  const [channels, setChannels] = useState<CommunicationChannel[]>([]);
+  
+  // Canais padrão sempre exibidos
+  const defaultChannels: CommunicationChannel[] = [
+    { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+    { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
+    { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+  ];
+  
+  const [channels, setChannels] = useState<CommunicationChannel[]>(defaultChannels);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(true);
 
   // Buscar integrações do backend
   useEffect(() => {
     const loadIntegrations = async () => {
-      // Sempre definir canais padrão primeiro
-      const defaultChannels: CommunicationChannel[] = [
-        { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-        { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
-        { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-      ];
+      setIsLoadingChannels(true);
       
+      // Começar com canais padrão
       let newChannels: CommunicationChannel[] = [...defaultChannels];
       
       try {
@@ -47,13 +52,17 @@ export function AgentConfigSection() {
         
         // Adicionar Z-API se configurada
         if (config && config.zapiInstanceId && config.zapiToken) {
-          newChannels.push({
-            id: 'zapi-whatsapp',
-            name: 'WhatsApp - Z-API',
-            tags: ['Z-API', 'WhatsApp', 'Mensagens'],
-            type: 'zapi',
-            status: 'connected',
-          });
+          // Verificar se Z-API já não está na lista
+          const hasZApi = newChannels.some(c => c.type === 'zapi');
+          if (!hasZApi) {
+            newChannels.push({
+              id: 'zapi-whatsapp',
+              name: 'WhatsApp - Z-API',
+              tags: ['Z-API', 'WhatsApp', 'Mensagens'],
+              type: 'zapi',
+              status: 'connected',
+            });
+          }
         }
       } catch (error) {
         console.error('Erro ao carregar integrações:', error);
@@ -61,6 +70,7 @@ export function AgentConfigSection() {
       } finally {
         // Sempre definir os canais, mesmo se houver erro
         setChannels(newChannels);
+        setIsLoadingChannels(false);
       }
     };
     
@@ -320,7 +330,16 @@ export function AgentConfigSection() {
               </div>
 
               <div className="space-y-3">
-                {channels.map((channel) => (
+                {isLoadingChannels ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Carregando canais...</p>
+                  </div>
+                ) : channels.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <p>Nenhum canal configurado</p>
+                  </div>
+                ) : (
+                  channels.map((channel) => (
                   <div
                     key={channel.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
@@ -379,7 +398,8 @@ export function AgentConfigSection() {
                       )}
                     </div>
                   </div>
-                ))}
+                  ))
+                )}
               </div>
             </TabsContent>
 
