@@ -199,10 +199,38 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         },
       });
     } catch (error: any) {
-      fastify.log.error({ error }, 'Erro ao salvar configurações de integração');
+      fastify.log.error({ 
+        error: error.message, 
+        stack: error.stack,
+        code: error.code,
+        meta: error.meta,
+        tenantId 
+      }, 'Erro ao salvar configurações de integração');
+      
+      // Mensagem de erro mais específica
+      let errorMessage = error.message || 'Erro desconhecido';
+      
+      // Se for erro de tabela não encontrada
+      if (error.message?.includes('does not exist') || 
+          error.message?.includes('relation') || 
+          error.code === '42P01' || 
+          error.code === 'P2025') {
+        errorMessage = 'Tabela IntegrationConfig não existe. A migration foi aplicada, mas o Prisma Client precisa ser regenerado. Reinicie o backend no Railway.';
+      }
+      
+      // Se for erro de Prisma Client
+      if (error.code === 'P2002' || error.message?.includes('Unique constraint')) {
+        errorMessage = 'Já existe uma configuração para este tenant. Tente atualizar em vez de criar.';
+      }
+      
       return reply.status(500).send({
         error: 'Erro ao salvar configurações',
-        message: error.message || 'Erro desconhecido',
+        message: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? {
+          code: error.code,
+          meta: error.meta,
+          stack: error.stack,
+        } : undefined,
       });
     }
   });
