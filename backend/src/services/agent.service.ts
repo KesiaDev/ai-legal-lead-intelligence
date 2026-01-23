@@ -8,9 +8,10 @@
 import OpenAI from 'openai';
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
+import { PromptService } from './prompt.service';
 
 // Importar prompts da plataforma (será adaptado para backend)
-const ORCHESTRATOR_PROMPT = `Você é o Super SDR Advogados, o Assistente Virtual de Pré-Vendas de um escritório de advocacia.
+const ORCHESTRATOR_PROMPT_DEFAULT = `Você é o Super SDR Advogados, o Assistente Virtual de Pré-Vendas de um escritório de advocacia.
 
 ## PAPEL
 Você é um Super SDR (Sales Development Representative) jurídico especializado. Seu papel é:
@@ -81,10 +82,12 @@ export class AgentService {
   private openai: OpenAI | null;
   private fastify: FastifyInstance;
   private prisma: PrismaClient;
+  private promptService: PromptService;
 
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;
     this.prisma = fastify.prisma as PrismaClient;
+    this.promptService = new PromptService(fastify);
 
     // Inicializar OpenAI se API key estiver configurada
     if (process.env.OPENAI_API_KEY) {
@@ -130,11 +133,18 @@ export class AgentService {
       throw new Error('OpenAI não configurado');
     }
 
+    // Obter prompt do serviço de prompts (tenta banco, depois padrão)
+    const promptConfig = await this.promptService.getPrompt('orquestrador', request.clienteId);
+    const systemPrompt = promptConfig?.content || ORCHESTRATOR_PROMPT_DEFAULT;
+    const model = promptConfig?.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const temperature = promptConfig?.temperature ?? 0.4;
+    const maxTokens = promptConfig?.maxTokens ?? 500;
+
     // Construir contexto da conversa
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       {
         role: 'system',
-        content: ORCHESTRATOR_PROMPT,
+        content: systemPrompt,
       },
     ];
 
@@ -152,12 +162,12 @@ export class AgentService {
       content: request.message,
     });
 
-    // Chamar OpenAI
+    // Chamar OpenAI com configurações do prompt
     const completion = await this.openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model,
       messages,
-      temperature: 0.4,
-      max_tokens: 500,
+      temperature,
+      max_tokens: maxTokens,
       response_format: { type: 'json_object' },
     });
 
