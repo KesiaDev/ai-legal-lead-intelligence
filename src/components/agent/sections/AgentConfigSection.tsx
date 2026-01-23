@@ -50,11 +50,19 @@ export function AgentConfigSection() {
         const response = await api.get('/api/integrations');
         const config = response.data;
         
+        console.log('Configurações carregadas:', {
+          zapiInstanceId: config?.zapiInstanceId,
+          zapiToken: config?.zapiToken ? '***' : null,
+          hasZApi: !!(config?.zapiInstanceId && config?.zapiToken),
+        });
+        
         // Adicionar Z-API se configurada
+        // O token pode estar mascarado (***1234), então verificamos se existe (não é null/undefined)
         if (config && config.zapiInstanceId && config.zapiToken) {
           // Verificar se Z-API já não está na lista
           const hasZApi = newChannels.some(c => c.type === 'zapi');
           if (!hasZApi) {
+            console.log('Adicionando Z-API aos canais');
             newChannels.push({
               id: 'zapi-whatsapp',
               name: 'WhatsApp - Z-API',
@@ -63,6 +71,11 @@ export function AgentConfigSection() {
               status: 'connected',
             });
           }
+        } else {
+          console.log('Z-API não configurada:', {
+            hasInstanceId: !!config?.zapiInstanceId,
+            hasToken: !!config?.zapiToken,
+          });
         }
       } catch (error) {
         console.error('Erro ao carregar integrações:', error);
