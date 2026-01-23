@@ -39,17 +39,52 @@ export function IntegrationsSettings() {
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
 
   useEffect(() => {
-    // Carregar configurações salvas (se houver endpoint)
-    // Por enquanto, carrega do localStorage ou deixa vazio
-    const saved = localStorage.getItem('integration_config');
-    if (saved) {
+    // Carregar configurações do backend
+    const loadConfig = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        setFormData(parsed);
-      } catch (e) {
-        console.error('Erro ao carregar configurações:', e);
+        const response = await api.get('/api/integrations');
+        const config = response.data;
+        
+        // Se tiver configurações no backend, usar
+        if (config) {
+          setFormData({
+            openaiApiKey: config.openaiApiKey && config.openaiApiKey !== 'null' ? '' : '', // Não mostrar chave completa
+            n8nWebhookUrl: config.n8nWebhookUrl || '',
+            evolutionApiUrl: config.evolutionApiUrl || '',
+            evolutionApiKey: config.evolutionApiKey && config.evolutionApiKey !== 'null' ? '' : '',
+            evolutionInstance: config.evolutionInstance || '',
+            zapiInstanceId: config.zapiInstanceId || '',
+            zapiToken: config.zapiToken && config.zapiToken !== 'null' ? '' : '',
+            zapiBaseUrl: config.zapiBaseUrl || 'https://api.z-api.io',
+          });
+        } else {
+          // Fallback para localStorage
+          const saved = localStorage.getItem('integration_config');
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              setFormData(parsed);
+            } catch (e) {
+              console.error('Erro ao carregar configurações:', e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar configurações do backend:', error);
+        // Fallback para localStorage
+        const saved = localStorage.getItem('integration_config');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setFormData(parsed);
+          } catch (e) {
+            console.error('Erro ao carregar configurações:', e);
+          }
+        }
       }
-    }
+    };
+
+    loadConfig();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,13 +92,24 @@ export function IntegrationsSettings() {
     setIsLoading(true);
 
     try {
-      // Salvar no localStorage por enquanto
-      // No futuro, salvar no backend via API
+      // Salvar no backend
+      const response = await api.patch('/api/integrations', {
+        openaiApiKey: formData.openaiApiKey || undefined,
+        n8nWebhookUrl: formData.n8nWebhookUrl || undefined,
+        evolutionApiUrl: formData.evolutionApiUrl || undefined,
+        evolutionApiKey: formData.evolutionApiKey || undefined,
+        evolutionInstance: formData.evolutionInstance || undefined,
+        zapiInstanceId: formData.zapiInstanceId || undefined,
+        zapiToken: formData.zapiToken || undefined,
+        zapiBaseUrl: formData.zapiBaseUrl || undefined,
+      });
+
+      // Também salvar no localStorage para referência
       localStorage.setItem('integration_config', JSON.stringify(formData));
 
       toast({
         title: 'Configurações salvas!',
-        description: 'As integrações foram configuradas com sucesso.',
+        description: 'As integrações foram configuradas com sucesso no backend.',
         variant: 'default',
       });
     } catch (err: any) {

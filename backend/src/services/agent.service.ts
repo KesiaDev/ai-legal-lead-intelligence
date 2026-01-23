@@ -60,17 +60,75 @@ export class AgentService {
       // Recuperar histórico de conversa do banco
       const conversationHistory = await this.getConversationHistory(request.lead_id);
 
+      // Verificar se OpenAI está disponível (env ou banco)
+      const apiKey = await this.getOpenAIApiKey(request.lead_id, request.clienteId);
+      const hasOpenAI = !!apiKey;
+
       // Se OpenAI estiver configurado, usar IA
-      if (this.openai) {
+      if (hasOpenAI) {
         return await this.processWithOpenAI(request, conversationHistory);
       } else {
         // Fallback para lógica básica
+        this.fastify.log.debug('OpenAI não disponível, usando fallback');
         return await this.processWithFallback(request, conversationHistory);
       }
     } catch (error: any) {
       this.fastify.log.error({ error }, 'Erro ao processar conversa com agente');
-      throw error;
+      // Em caso de erro, tenta fallback
+      try {
+        const conversationHistory = await this.getConversationHistory(request.lead_id);
+        return await this.processWithFallback(request, conversationHistory);
+      } catch (fallbackError) {
+        throw error; // Se fallback também falhar, lança erro original
+      }
     }
+  }
+
+  /**
+   * Obtém API key da OpenAI (variável de ambiente ou banco por tenant)
+   */
+  private async getOpenAIApiKey(leadId?: string, clienteId?: string): Promise<string | null> {
+    // Primeiro, tenta variável de ambiente (global)
+    if (process.env.OPENAI_API_KEY) {
+      return process.env.OPENAI_API_KEY;
+    }
+
+    // Tentar obter tenantId do lead ou clienteId
+    let tenantId: string | undefined = clienteId;
+
+    // Se não tiver tenantId mas tiver leadId, buscar do lead
+    if (!tenantId && leadId) {
+      try {
+        const lead = await this.prisma.lead.findUnique({
+          where: { id: leadId },
+          select: { tenantId: true },
+        });
+        if (lead) {
+          tenantId = lead.tenantId;
+        }
+      } catch (error) {
+        this.fastify.log.warn({ error, leadId }, 'Erro ao buscar tenantId do lead');
+      }
+    }
+
+    // Se tiver tenantId, busca no banco
+    if (tenantId) {
+      try {
+        const config = await this.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+          select: { openaiApiKey: true },
+        });
+
+        if (config?.openaiApiKey) {
+          this.fastify.log.info({ tenantId }, 'OpenAI API key encontrada no banco');
+          return config.openaiApiKey;
+        }
+      } catch (error) {
+        this.fastify.log.warn({ error, tenantId }, 'Erro ao buscar OpenAI API key do banco');
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -80,9 +138,18 @@ export class AgentService {
     request: ConversationRequest,
     history: Array<{ role: string; content: string }>
   ): Promise<AgentResponse> {
-    if (!this.openai) {
-      throw new Error('OpenAI não configurado');
+    // Buscar API key (env ou banco)
+    const apiKey = await this.getOpenAIApiKey(request.lead_id, request.clienteId);
+    
+    if (!apiKey) {
+      this.fastify.log.warn('OpenAI API key não encontrada, usando fallback');
+      return await this.processWithFallback(request, history);
     }
+
+    // Criar cliente OpenAI com a chave encontrada
+    const openai = new OpenAI({
+      apiKey: apiKey,
+    });
 
     // Obter prompt do serviço de prompts (tenta banco, depois padrão)
     const promptConfig = await this.promptService.getPrompt('orquestrador', request.clienteId);
@@ -119,7 +186,7 @@ export class AgentService {
     });
 
     // Chamar OpenAI com configurações do prompt
-    const completion = await this.openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
       model,
       messages,
       temperature,

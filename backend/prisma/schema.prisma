@@ -28,6 +28,7 @@ model Tenant {
   crmIntegrations CrmIntegration[]
   agentPrompts    AgentPrompt[]
   voiceConfigs    VoiceConfig[]
+  integrationConfig IntegrationConfig?
 
   @@index([plan])
 }
@@ -378,4 +379,36 @@ model VoiceConfig {
   @@unique([tenantId])
   @@index([tenantId])
   @@index([enabled])
+}
+
+////////////////////
+// INTEGRATION CONFIG //
+////////////////////
+
+model IntegrationConfig {
+  id String @id @default(uuid())
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // OpenAI
+  openaiApiKey String? // API Key da OpenAI (criptografada)
+
+  // N8N (opcional, para workflows externos)
+  n8nWebhookUrl String?
+
+  // Evolution API (legado, pode ser removido)
+  evolutionApiUrl    String?
+  evolutionApiKey    String?
+  evolutionInstance String?
+
+  // Z-API (já configurado via env vars, mas pode ser por tenant no futuro)
+  zapiInstanceId String?
+  zapiToken      String?
+  zapiBaseUrl    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }

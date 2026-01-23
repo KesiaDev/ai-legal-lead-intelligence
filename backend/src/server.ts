@@ -15,6 +15,7 @@ import { registerWhatsAppRoutes } from './api/whatsapp.routes';
 import { registerZApiRoutes } from './api/zapi.routes';
 import { registerPromptsRoutes } from './api/prompts.routes';
 import { registerVoiceRoutes } from './api/voice.routes';
+import { registerIntegrationsRoutes } from './api/integrations.routes';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
@@ -452,6 +453,9 @@ async function build() {
   await registerConversationRoute(fastify);
   await registerWhatsAppRoutes(fastify);
   await registerZApiRoutes(fastify);
+  await registerPromptsRoutes(fastify);
+  await registerVoiceRoutes(fastify);
+  await registerIntegrationsRoutes(fastify);
 
   // ======================================================
   // PIPELINES E DEALS
