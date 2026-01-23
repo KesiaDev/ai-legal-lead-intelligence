@@ -25,28 +25,9 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         });
       }
 
-      let config;
-      try {
-        config = await fastify.prisma.integrationConfig.findUnique({
-          where: { tenantId },
-        });
-      } catch (dbError: any) {
-        // Se a tabela não existir, retornar null (migration não aplicada)
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01') {
-          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não existe ainda');
-          return reply.send({
-            openaiApiKey: null,
-            n8nWebhookUrl: null,
-            evolutionApiUrl: null,
-            evolutionApiKey: null,
-            evolutionInstance: null,
-            zapiInstanceId: null,
-            zapiToken: null,
-            zapiBaseUrl: null,
-          });
-        }
-        throw dbError;
-      }
+      const config = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
 
       // Não retornar API keys completas por segurança (apenas indicar se existe)
       return reply.send({
@@ -97,88 +78,61 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       };
 
       // Verificar se já existe configuração
-      let existing;
-      try {
-        existing = await fastify.prisma.integrationConfig.findUnique({
-          where: { tenantId },
-        });
-      } catch (dbError: any) {
-        // Se a tabela não existir, criar a primeira vez
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01') {
-          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não existe ainda, criando...');
-          existing = null;
-        } else {
-          throw dbError;
-        }
-      }
+      const existing = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
 
       let config;
-      try {
-        if (existing) {
-          // Atualizar existente
-          // IMPORTANTE: Se openaiApiKey for null explicitamente, limpar o campo
-          const updateData: any = {
-            updatedAt: new Date(),
-          };
-          
-          if (body.openaiApiKey !== undefined) {
-            updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
-          }
-          if (body.n8nWebhookUrl !== undefined) {
-            updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
-          }
-          if (body.evolutionApiUrl !== undefined) {
-            updateData.evolutionApiUrl = body.evolutionApiUrl || null;
-          }
-          if (body.evolutionApiKey !== undefined) {
-            updateData.evolutionApiKey = body.evolutionApiKey || null;
-          }
-          if (body.evolutionInstance !== undefined) {
-            updateData.evolutionInstance = body.evolutionInstance || null;
-          }
-          if (body.zapiInstanceId !== undefined) {
-            updateData.zapiInstanceId = body.zapiInstanceId || null;
-          }
-          if (body.zapiToken !== undefined) {
-            updateData.zapiToken = body.zapiToken || null;
-          }
-          if (body.zapiBaseUrl !== undefined) {
-            updateData.zapiBaseUrl = body.zapiBaseUrl || null;
-          }
-          
-          config = await fastify.prisma.integrationConfig.update({
-            where: { tenantId },
-            data: updateData,
-          });
-        } else {
-          // Criar novo
-          config = await fastify.prisma.integrationConfig.create({
-            data: {
-              tenantId,
-              openaiApiKey: body.openaiApiKey || null,
-              n8nWebhookUrl: body.n8nWebhookUrl || null,
-              evolutionApiUrl: body.evolutionApiUrl || null,
-              evolutionApiKey: body.evolutionApiKey || null,
-              evolutionInstance: body.evolutionInstance || null,
-              zapiInstanceId: body.zapiInstanceId || null,
-              zapiToken: body.zapiToken || null,
-              zapiBaseUrl: body.zapiBaseUrl || null,
-            },
-          });
+      if (existing) {
+        // Atualizar existente
+        const updateData: any = {
+          updatedAt: new Date(),
+        };
+        
+        if (body.openaiApiKey !== undefined) {
+          updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
         }
-      } catch (dbError: any) {
-        // Se der erro ao criar/atualizar, pode ser que a tabela ainda não foi reconhecida pelo Prisma
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
-          fastify.log.error({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não reconhecida pelo Prisma após migration. Tente regenerar o Prisma Client.');
-          return reply.status(503).send({
-            error: 'Tabela não reconhecida',
-            message: 'A migration foi aplicada, mas o Prisma Client precisa ser regenerado. Aguarde alguns minutos e tente novamente.',
-            suggestion: 'O backend precisa ser reiniciado para reconhecer as novas tabelas.',
-          });
+        if (body.n8nWebhookUrl !== undefined) {
+          updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
         }
-        // Outros erros de banco
-        fastify.log.error({ tenantId, error: dbError }, 'Erro ao salvar IntegrationConfig');
-        throw dbError;
+        if (body.evolutionApiUrl !== undefined) {
+          updateData.evolutionApiUrl = body.evolutionApiUrl || null;
+        }
+        if (body.evolutionApiKey !== undefined) {
+          updateData.evolutionApiKey = body.evolutionApiKey || null;
+        }
+        if (body.evolutionInstance !== undefined) {
+          updateData.evolutionInstance = body.evolutionInstance || null;
+        }
+        if (body.zapiInstanceId !== undefined) {
+          updateData.zapiInstanceId = body.zapiInstanceId || null;
+        }
+        if (body.zapiToken !== undefined) {
+          updateData.zapiToken = body.zapiToken || null;
+        }
+        if (body.zapiBaseUrl !== undefined) {
+          updateData.zapiBaseUrl = body.zapiBaseUrl || null;
+        }
+        
+        config = await fastify.prisma.integrationConfig.update({
+          where: { tenantId },
+          data: updateData,
+        });
+      } else {
+        // Criar novo
+        config = await fastify.prisma.integrationConfig.create({
+          data: {
+            tenantId,
+            openaiApiKey: body.openaiApiKey || null,
+            n8nWebhookUrl: body.n8nWebhookUrl || null,
+            evolutionApiUrl: body.evolutionApiUrl || null,
+            evolutionApiKey: body.evolutionApiKey || null,
+            evolutionInstance: body.evolutionInstance || null,
+            zapiInstanceId: body.zapiInstanceId || null,
+            zapiToken: body.zapiToken || null,
+            zapiBaseUrl: body.zapiBaseUrl || null,
+          },
+        });
       }
 
       fastify.log.info({ tenantId }, 'Configurações de integração atualizadas');
@@ -207,30 +161,9 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         tenantId 
       }, 'Erro ao salvar configurações de integração');
       
-      // Mensagem de erro mais específica
-      let errorMessage = error.message || 'Erro desconhecido';
-      
-      // Se for erro de tabela não encontrada
-      if (error.message?.includes('does not exist') || 
-          error.message?.includes('relation') || 
-          error.code === '42P01' || 
-          error.code === 'P2025') {
-        errorMessage = 'Tabela IntegrationConfig não existe. A migration foi aplicada, mas o Prisma Client precisa ser regenerado. Reinicie o backend no Railway.';
-      }
-      
-      // Se for erro de Prisma Client
-      if (error.code === 'P2002' || error.message?.includes('Unique constraint')) {
-        errorMessage = 'Já existe uma configuração para este tenant. Tente atualizar em vez de criar.';
-      }
-      
       return reply.status(500).send({
         error: 'Erro ao salvar configurações',
-        message: errorMessage,
-        details: process.env.NODE_ENV === 'development' ? {
-          code: error.code,
-          meta: error.meta,
-          stack: error.stack,
-        } : undefined,
+        message: error.message || 'Erro desconhecido',
       });
     }
   });

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Save, Key, Webhook, Database, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Save, Key, Webhook, Database, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 import { api } from '@/api/client';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,7 +38,6 @@ export function IntegrationsSettings() {
 
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<number | null>(null);
-  const [isApplyingMigration, setIsApplyingMigration] = useState(false);
 
   useEffect(() => {
     // Só carregar se o usuário estiver autenticado
@@ -190,115 +189,6 @@ export function IntegrationsSettings() {
     }
   };
 
-  const applyMigration = async () => {
-    setIsApplyingMigration(true);
-    try {
-      toast({
-        title: '⏳ Aplicando migration...',
-        description: 'Aguarde, isso pode levar alguns segundos.',
-        variant: 'default',
-      });
-
-      const response = await fetch('https://api.sdrjuridico.com.br/api/apply-migrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secret: 'fix-migration-2026' }),
-      });
-      
-      // Verificar se a resposta é JSON
-      let data;
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(`Resposta inválida do servidor: ${text.substring(0, 100)}`);
-      }
-      
-      if (!response.ok) {
-        throw new Error(data.error || `Erro ${response.status}: ${data.message || 'Erro desconhecido'}`);
-      }
-      
-      if (data.success) {
-        // Mostrar resultados no console
-        console.log('✅ Migration aplicada!', data.results);
-        
-        // Contar quantas migrations foram aplicadas
-        const successCount = data.results?.filter((r: any) => r.status === 'success').length || 0;
-        const errorCount = data.results?.filter((r: any) => r.status === 'error').length || 0;
-        const skippedCount = data.results?.filter((r: any) => r.status === 'skipped').length || 0;
-        
-        // Mostrar detalhes no console
-        console.log(`📊 Resultados: ${successCount} sucesso, ${skippedCount} pulados, ${errorCount} erros`);
-        if (errorCount > 0) {
-          const errors = data.results?.filter((r: any) => r.status === 'error');
-          console.error('❌ Erros encontrados:', errors);
-        }
-        
-        let description = '';
-        if (successCount > 0) {
-          description = `✅ ${successCount} comando(s) executado(s) com sucesso. `;
-        }
-        if (skippedCount > 0) {
-          description += `⏭️ ${skippedCount} comando(s) já existiam (pulados). `;
-        }
-        if (errorCount > 0) {
-          description += `❌ ${errorCount} erro(s). Veja o console (F12) para detalhes. `;
-        }
-        description += 'Aguarde 30 segundos e tente salvar novamente. Se não funcionar, reinicie o backend no Railway.';
-        
-        toast({
-          title: successCount > 0 || skippedCount > 0 ? '✅ Migration aplicada!' : '⚠️ Migration com problemas',
-          description: description,
-          variant: errorCount > 0 && successCount === 0 ? 'destructive' : 'default',
-        });
-        
-        // Aguardar 30 segundos e tentar regenerar Prisma Client
-        setTimeout(async () => {
-          try {
-            console.log('🔄 Tentando regenerar Prisma Client...');
-            const regenerateResponse = await fetch('https://api.sdrjuridico.com.br/api/regenerate-prisma', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ secret: 'fix-migration-2026' }),
-            });
-            
-            const regenerateData = await regenerateResponse.json();
-            
-            if (regenerateData.success) {
-              console.log('✅ Prisma Client regenerado!');
-              toast({
-                title: '✅ Prisma Client regenerado!',
-                description: 'Agora você pode tentar salvar novamente. Se ainda não funcionar, reinicie o backend no Railway.',
-                variant: 'default',
-              });
-            } else {
-              console.warn('⚠️ Não foi possível regenerar Prisma Client automaticamente');
-            }
-          } catch (regenerateError) {
-            console.warn('⚠️ Erro ao regenerar Prisma Client:', regenerateError);
-            // Não mostrar erro para o usuário, apenas logar
-          }
-        }, 30000); // 30 segundos
-        
-        // Não recarregar automaticamente - deixar o usuário recarregar manualmente
-        // Isso dá tempo para ver a mensagem e entender o que aconteceu
-      } else {
-        throw new Error(data.error || data.message || 'Erro ao aplicar migration');
-      }
-    } catch (err: any) {
-      console.error('Erro completo ao aplicar migration:', err);
-      const errorMessage = err.message || 'Não foi possível aplicar a migration. Verifique os logs do Railway.';
-      
-      toast({
-        title: '❌ Erro ao aplicar migration',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsApplyingMigration(false);
-    }
-  };
 
   const testConnection = async (type: 'openai' | 'n8n' | 'evolution' | 'zapi') => {
     setTestResults({ ...testResults, [type]: 'pending' });
@@ -414,41 +304,6 @@ export function IntegrationsSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Botão para aplicar migration se houver erro 500 */}
-      <Card className="border-yellow-200 bg-yellow-50">
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-yellow-900">Migration Pendente</p>
-                <p className="text-sm text-yellow-800 mt-1">
-                  Se você está vendo erros 500, a migration do banco de dados precisa ser aplicada.
-                </p>
-              </div>
-            </div>
-            <Button
-              onClick={applyMigration}
-              disabled={isApplyingMigration}
-              variant="default"
-              className="bg-yellow-600 hover:bg-yellow-700"
-            >
-              {isApplyingMigration ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Aplicando...
-                </>
-              ) : (
-                <>
-                  <Database className="w-4 h-4 mr-2" />
-                  Aplicar Migration
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <Tabs defaultValue="openai" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="openai">OpenAI</TabsTrigger>
