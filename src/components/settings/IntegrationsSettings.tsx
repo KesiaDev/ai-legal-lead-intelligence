@@ -54,13 +54,22 @@ export function IntegrationsSettings() {
         // Se tiver configurações no backend, usar
         if (config) {
           setFormData({
-            openaiApiKey: config.openaiApiKey && config.openaiApiKey !== 'null' ? '' : '', // Não mostrar chave completa
+            // Para API keys, não mostrar o valor completo por segurança, mas manter indicador
+            // Se existe (não é null), manter string vazia para o usuário digitar novamente se quiser
+            // OU manter o valor se já estiver no localStorage (para não perder ao recarregar)
+            openaiApiKey: (config.openaiApiKey && config.openaiApiKey !== 'null') 
+              ? (localStorage.getItem('openai_api_key_temp') || '') 
+              : '',
             n8nWebhookUrl: config.n8nWebhookUrl || '',
             evolutionApiUrl: config.evolutionApiUrl || '',
-            evolutionApiKey: config.evolutionApiKey && config.evolutionApiKey !== 'null' ? '' : '',
+            evolutionApiKey: (config.evolutionApiKey && config.evolutionApiKey !== 'null')
+              ? (localStorage.getItem('evolution_api_key_temp') || '')
+              : '',
             evolutionInstance: config.evolutionInstance || '',
             zapiInstanceId: config.zapiInstanceId || '',
-            zapiToken: config.zapiToken && config.zapiToken !== 'null' ? '' : '',
+            zapiToken: (config.zapiToken && config.zapiToken !== 'null')
+              ? (localStorage.getItem('zapi_token_temp') || '')
+              : '',
             zapiBaseUrl: config.zapiBaseUrl || 'https://api.z-api.io',
           });
         } else {
@@ -108,16 +117,37 @@ export function IntegrationsSettings() {
 
     try {
       // Salvar no backend
-      const response = await api.patch('/api/integrations', {
-        openaiApiKey: formData.openaiApiKey || undefined,
-        n8nWebhookUrl: formData.n8nWebhookUrl || undefined,
-        evolutionApiUrl: formData.evolutionApiUrl || undefined,
-        evolutionApiKey: formData.evolutionApiKey || undefined,
-        evolutionInstance: formData.evolutionInstance || undefined,
-        zapiInstanceId: formData.zapiInstanceId || undefined,
-        zapiToken: formData.zapiToken || undefined,
-        zapiBaseUrl: formData.zapiBaseUrl || undefined,
-      });
+      // IMPORTANTE: Enviar openaiApiKey mesmo se for string vazia, para permitir limpar
+      const payload: any = {};
+      
+      // Sempre enviar openaiApiKey se estiver definido (mesmo que vazio)
+      if (formData.openaiApiKey !== undefined) {
+        payload.openaiApiKey = formData.openaiApiKey || null; // Enviar null se vazio para limpar
+      }
+      
+      if (formData.n8nWebhookUrl !== undefined) {
+        payload.n8nWebhookUrl = formData.n8nWebhookUrl || undefined;
+      }
+      if (formData.evolutionApiUrl !== undefined) {
+        payload.evolutionApiUrl = formData.evolutionApiUrl || undefined;
+      }
+      if (formData.evolutionApiKey !== undefined) {
+        payload.evolutionApiKey = formData.evolutionApiKey || undefined;
+      }
+      if (formData.evolutionInstance !== undefined) {
+        payload.evolutionInstance = formData.evolutionInstance || undefined;
+      }
+      if (formData.zapiInstanceId !== undefined) {
+        payload.zapiInstanceId = formData.zapiInstanceId || undefined;
+      }
+      if (formData.zapiToken !== undefined) {
+        payload.zapiToken = formData.zapiToken || undefined;
+      }
+      if (formData.zapiBaseUrl !== undefined) {
+        payload.zapiBaseUrl = formData.zapiBaseUrl || undefined;
+      }
+      
+      const response = await api.patch('/api/integrations', payload);
 
       // Também salvar no localStorage para referência
       localStorage.setItem('integration_config', JSON.stringify(formData));
@@ -321,6 +351,13 @@ export function IntegrationsSettings() {
                     onChange={(e) => {
                       const newValue = e.target.value;
                       setFormData({ ...formData, openaiApiKey: newValue });
+                      
+                      // Salvar temporariamente no localStorage para não perder ao recarregar
+                      if (newValue) {
+                        localStorage.setItem('openai_api_key_temp', newValue);
+                      } else {
+                        localStorage.removeItem('openai_api_key_temp');
+                      }
                       
                       // Auto-save após 2 segundos sem digitar
                       setAutoSaveTimeout((prevTimeout) => {

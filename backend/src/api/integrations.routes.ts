@@ -115,19 +115,39 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       let config;
       if (existing) {
         // Atualizar existente
+        // IMPORTANTE: Se openaiApiKey for null explicitamente, limpar o campo
+        const updateData: any = {
+          updatedAt: new Date(),
+        };
+        
+        if (body.openaiApiKey !== undefined) {
+          updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
+        }
+        if (body.n8nWebhookUrl !== undefined) {
+          updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
+        }
+        if (body.evolutionApiUrl !== undefined) {
+          updateData.evolutionApiUrl = body.evolutionApiUrl || null;
+        }
+        if (body.evolutionApiKey !== undefined) {
+          updateData.evolutionApiKey = body.evolutionApiKey || null;
+        }
+        if (body.evolutionInstance !== undefined) {
+          updateData.evolutionInstance = body.evolutionInstance || null;
+        }
+        if (body.zapiInstanceId !== undefined) {
+          updateData.zapiInstanceId = body.zapiInstanceId || null;
+        }
+        if (body.zapiToken !== undefined) {
+          updateData.zapiToken = body.zapiToken || null;
+        }
+        if (body.zapiBaseUrl !== undefined) {
+          updateData.zapiBaseUrl = body.zapiBaseUrl || null;
+        }
+        
         config = await fastify.prisma.integrationConfig.update({
           where: { tenantId },
-          data: {
-            ...(body.openaiApiKey !== undefined && { openaiApiKey: body.openaiApiKey }),
-            ...(body.n8nWebhookUrl !== undefined && { n8nWebhookUrl: body.n8nWebhookUrl }),
-            ...(body.evolutionApiUrl !== undefined && { evolutionApiUrl: body.evolutionApiUrl }),
-            ...(body.evolutionApiKey !== undefined && { evolutionApiKey: body.evolutionApiKey }),
-            ...(body.evolutionInstance !== undefined && { evolutionInstance: body.evolutionInstance }),
-            ...(body.zapiInstanceId !== undefined && { zapiInstanceId: body.zapiInstanceId }),
-            ...(body.zapiToken !== undefined && { zapiToken: body.zapiToken }),
-            ...(body.zapiBaseUrl !== undefined && { zapiBaseUrl: body.zapiBaseUrl }),
-            updatedAt: new Date(),
-          },
+          data: updateData,
         });
       } else {
         // Criar novo
