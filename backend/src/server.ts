@@ -470,11 +470,11 @@ async function build() {
   await registerCrmRoutes(fastify);
 
   // ======================================================
-  // ENDPOINT TEMPORÁRIO: FIX MIGRATION
-  // ⚠️ REMOVER DEPOIS DE APLICAR A MIGRATION
+  // ENDPOINT TEMPORÁRIO: APLICAR MIGRATIONS MANUALMENTE
+  // ⚠️ REMOVER DEPOIS DE APLICAR AS MIGRATIONS
   // Chave secreta temporária: fix-migration-2026
   // ======================================================
-  fastify.post('/api/fix-migration', async (request, reply) => {
+  fastify.post('/api/apply-migrations', async (request, reply) => {
     try {
       const { secret } = request.body as { secret?: string };
       
@@ -501,20 +501,34 @@ async function build() {
         .map(cmd => cmd.trim())
         .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
 
-      const results = [];
-      for (const command of commands) {
-        if (command.length > 0) {
-          try {
-            await prisma.$executeRawUnsafe(command);
-            results.push({ status: 'success', command: command.substring(0, 80) + '...' });
-          } catch (error: any) {
-            if (error.message.includes('already exists') || 
-                error.message.includes('does not exist') ||
-                error.message.includes('duplicate') ||
-                error.message.includes('constraint')) {
-              results.push({ status: 'skipped', command: command.substring(0, 80) + '...', reason: 'already exists' });
-            } else {
-              results.push({ status: 'error', command: command.substring(0, 80) + '...', error: error.message });
+        for (const command of commands) {
+          if (command.length > 0) {
+            try {
+              await prisma.$executeRawUnsafe(command);
+              results.push({ 
+                migration: path.basename(migrationPath),
+                status: 'success', 
+                command: command.substring(0, 80) + '...' 
+              });
+            } catch (error: any) {
+              if (error.message.includes('already exists') || 
+                  error.message.includes('does not exist') ||
+                  error.message.includes('duplicate') ||
+                  error.message.includes('constraint')) {
+                results.push({ 
+                  migration: path.basename(migrationPath),
+                  status: 'skipped', 
+                  command: command.substring(0, 80) + '...', 
+                  reason: 'already exists' 
+                });
+              } else {
+                results.push({ 
+                  migration: path.basename(migrationPath),
+                  status: 'error', 
+                  command: command.substring(0, 80) + '...', 
+                  error: error.message 
+                });
+              }
             }
           }
         }
@@ -522,8 +536,7 @@ async function build() {
 
       return reply.send({
         success: true,
-        message: 'Migration aplicada com sucesso',
-        totalCommands: commands.length,
+        message: 'Migrations aplicadas',
         results,
       });
     } catch (err: unknown) {
