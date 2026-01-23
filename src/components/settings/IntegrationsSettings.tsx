@@ -199,12 +199,24 @@ export function IntegrationsSettings() {
         body: JSON.stringify({ secret: 'fix-migration-2026' }),
       });
       
-      const data = await response.json();
+      // Verificar se a resposta é JSON
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(`Resposta inválida do servidor: ${text.substring(0, 100)}`);
+      }
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Erro ${response.status}: ${data.message || 'Erro desconhecido'}`);
+      }
       
       if (data.success) {
         toast({
           title: '✅ Migration aplicada!',
-          description: 'A tabela foi criada com sucesso. Recarregue a página.',
+          description: 'A tabela foi criada com sucesso. Recarregando a página...',
           variant: 'default',
         });
         // Recarregar após 2 segundos
@@ -212,12 +224,15 @@ export function IntegrationsSettings() {
           window.location.reload();
         }, 2000);
       } else {
-        throw new Error(data.error || 'Erro ao aplicar migration');
+        throw new Error(data.error || data.message || 'Erro ao aplicar migration');
       }
     } catch (err: any) {
+      console.error('Erro completo ao aplicar migration:', err);
+      const errorMessage = err.message || 'Não foi possível aplicar a migration. Verifique os logs do Railway.';
+      
       toast({
         title: '❌ Erro ao aplicar migration',
-        description: err.message || 'Não foi possível aplicar a migration. Verifique os logs.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
