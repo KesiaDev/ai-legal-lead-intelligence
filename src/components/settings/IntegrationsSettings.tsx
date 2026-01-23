@@ -91,14 +91,16 @@ export function IntegrationsSettings() {
     };
 
     loadConfig();
-    
-    // Cleanup: limpar timeout ao desmontar
+  }, [user]);
+  
+  // Cleanup: limpar timeout ao desmontar
+  useEffect(() => {
     return () => {
       if (autoSaveTimeout) {
         clearTimeout(autoSaveTimeout);
       }
     };
-  }, [user]);
+  }, [autoSaveTimeout]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,29 +323,31 @@ export function IntegrationsSettings() {
                       setFormData({ ...formData, openaiApiKey: newValue });
                       
                       // Auto-save após 2 segundos sem digitar
-                      if (autoSaveTimeout) {
-                        clearTimeout(autoSaveTimeout);
-                      }
-                      
-                      const timeout = setTimeout(async () => {
-                        if (newValue && newValue.length > 10) {
-                          try {
-                            await api.patch('/api/integrations', {
-                              openaiApiKey: newValue,
-                            });
-                            toast({
-                              title: 'Salvo automaticamente!',
-                              description: 'A chave da OpenAI foi salva automaticamente.',
-                              variant: 'default',
-                            });
-                          } catch (err: any) {
-                            // Silenciosamente falha - usuário pode salvar manualmente depois
-                            console.log('Auto-save falhou (pode ser migration pendente):', err.message);
-                          }
+                      setAutoSaveTimeout((prevTimeout) => {
+                        if (prevTimeout) {
+                          clearTimeout(prevTimeout);
                         }
-                      }, 2000);
-                      
-                      setAutoSaveTimeout(timeout);
+                        
+                        const timeout = window.setTimeout(async () => {
+                          if (newValue && newValue.length > 10) {
+                            try {
+                              await api.patch('/api/integrations', {
+                                openaiApiKey: newValue,
+                              });
+                              toast({
+                                title: 'Salvo automaticamente!',
+                                description: 'A chave da OpenAI foi salva automaticamente.',
+                                variant: 'default',
+                              });
+                            } catch (err: any) {
+                              // Silenciosamente falha - usuário pode salvar manualmente depois
+                              console.log('Auto-save falhou (pode ser migration pendente):', err.message);
+                            }
+                          }
+                        }, 2000);
+                        
+                        return timeout;
+                      });
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
