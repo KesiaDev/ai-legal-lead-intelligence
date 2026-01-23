@@ -81,20 +81,24 @@ export function VoiceConfigSection() {
       </div>
 
       {/* Aviso */}
-      <Card className="border-info/50 bg-info/5">
-        <CardContent className="pt-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-info mt-0.5" />
-            <div>
-              <p className="font-medium text-foreground">Integração Preparada</p>
-              <p className="text-sm text-muted-foreground">
-                A arquitetura está pronta para ElevenLabs. Configure sua API key nas variáveis de ambiente para ativar.
-                URLs, emails, valores monetários e termos sensíveis são automaticamente convertidos para texto escrito.
-              </p>
+      {!voiceConfig.enabled && (
+        <Card className="border-info/50 bg-info/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-info mt-0.5" />
+              <div>
+                <p className="font-medium text-foreground">Como Configurar</p>
+                <p className="text-sm text-muted-foreground">
+                  1. Obtenha sua API Key em: <strong>elevenlabs.io → Profile → API Keys</strong><br/>
+                  2. Escolha uma voz e copie o Voice ID<br/>
+                  3. Preencha os campos abaixo e ative a voz<br/>
+                  URLs, emails, valores monetários e termos sensíveis são automaticamente convertidos para texto escrito.
+                </p>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Configurações de Voz */}
@@ -106,6 +110,29 @@ export function VoiceConfigSection() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* API Key do ElevenLabs */}
+            <div className="space-y-2">
+              <Label htmlFor="elevenlabs-api-key">
+                API Key do ElevenLabs
+                <span className="text-xs text-muted-foreground ml-2">(obrigatório)</span>
+              </Label>
+              <Input
+                id="elevenlabs-api-key"
+                type="password"
+                placeholder="sk_..."
+                value={(voiceConfig as any).elevenlabsApiKey || ''}
+                onChange={(e) => updateVoiceConfig({ 
+                  ...voiceConfig,
+                  elevenlabsApiKey: e.target.value 
+                } as any)}
+                disabled={!voiceConfig.enabled}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Obtenha em: elevenlabs.io → Profile → API Keys
+              </p>
+            </div>
+
             {/* Provider */}
             <div className="space-y-2">
               <Label>Provider</Label>

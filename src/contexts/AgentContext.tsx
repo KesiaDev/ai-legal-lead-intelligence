@@ -433,6 +433,40 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [intentions, setIntentions] = useState<Intention[]>(defaultIntentions);
   const [humanizationConfig, setHumanizationConfig] = useState<HumanizationConfig>(DEFAULT_HUMANIZATION_CONFIG);
   const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(DEFAULT_VOICE_CONFIG);
+  
+  // Carregar configuração de voz do backend
+  useEffect(() => {
+    if (user) {
+      loadVoiceConfigFromBackend();
+    }
+  }, [user]);
+
+  const loadVoiceConfigFromBackend = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/api/voice/config`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.config) {
+          setVoiceConfig({
+            ...DEFAULT_VOICE_CONFIG,
+            ...data.config,
+            elevenlabsApiKey: data.config.elevenlabsApiKey || (voiceConfig as any).elevenlabsApiKey,
+          } as VoiceConfig);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configuração de voz:', error);
+    }
+  };
+  
   const [templates, setTemplates] = useState<MessageTemplate[]>(DEFAULT_TEMPLATES);
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>(DEFAULT_FUNNEL_STAGES);
   const [lawyers, setLawyers] = useState<Lawyer[]>(DEFAULT_LAWYERS);
@@ -539,8 +573,33 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setHumanizationConfig(prev => ({ ...prev, ...updates }));
   };
 
-  const updateVoiceConfig = (updates: Partial<VoiceConfig>) => {
-    setVoiceConfig(prev => ({ ...prev, ...updates }));
+  const updateVoiceConfig = async (updates: Partial<VoiceConfig>) => {
+    const newConfig = { ...voiceConfig, ...updates };
+    setVoiceConfig(newConfig);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/api/voice/config`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...newConfig,
+          elevenlabsApiKey: (newConfig as any).elevenlabsApiKey,
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error('Erro ao salvar configuração de voz:', await response.text());
+      }
+    } catch (error) {
+      console.error('Erro ao salvar configuração de voz:', error);
+    }
   };
 
   // Templates

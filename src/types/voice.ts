@@ -11,6 +11,9 @@ export interface VoiceConfig {
   // Provider de voz
   provider: VoiceProvider;
   
+  // API Key do ElevenLabs (opcional, pode ser configurada por tenant)
+  elevenlabsApiKey?: string;
+  
   // ID da voz selecionada (ElevenLabs)
   voiceId: string;
   voiceName: string;
