@@ -445,7 +445,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const loadVoiceConfigFromBackend = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/api/voice/config`, {
         headers: {
@@ -471,7 +471,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const loadAgentConfigFromBackend = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/api/agent/config`, {
         headers: {
@@ -571,7 +571,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -597,7 +597,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -675,7 +675,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -696,7 +696,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -717,7 +717,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -739,7 +739,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -763,7 +763,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -787,7 +787,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -811,7 +811,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -835,7 +835,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -859,7 +859,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -883,7 +883,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     // Salvar no backend
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/api/voice/config`, {
         method: 'POST',
@@ -912,7 +912,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -933,7 +933,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -954,7 +954,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -976,7 +976,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -997,7 +997,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1018,7 +1018,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1040,7 +1040,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1061,7 +1061,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1082,7 +1082,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1104,7 +1104,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1126,7 +1126,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1147,7 +1147,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1168,7 +1168,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',
@@ -1190,7 +1190,7 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
       await fetch(`${API_URL}/api/agent/config`, {
         method: 'PATCH',

@@ -39,6 +39,11 @@ export function IntegrationsSettings() {
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
 
   useEffect(() => {
+    // Só carregar se o usuário estiver autenticado
+    if (!user) {
+      return;
+    }
+
     // Carregar configurações do backend
     const loadConfig = async () => {
       try {
@@ -85,7 +90,7 @@ export function IntegrationsSettings() {
     };
 
     loadConfig();
-  }, []);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,9 +118,15 @@ export function IntegrationsSettings() {
         variant: 'default',
       });
     } catch (err: any) {
+      console.error('Erro completo ao salvar:', err);
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.error || 
+                          err.message || 
+                          'Não foi possível salvar as alterações. Verifique se está autenticado.';
+      
       toast({
         title: 'Erro ao salvar configurações',
-        description: err.response?.data?.message || 'Não foi possível salvar as alterações.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
