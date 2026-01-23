@@ -178,15 +178,23 @@ export class ZApiService {
       });
 
       // Processar com agente IA
-      const agentResponse = await this.agentService.processConversation(
-        conversation.id,
-        message.message,
-        tenantId
-      );
+      const agentResponse = await this.agentService.processConversation({
+        lead_id: lead.id,
+        message: message.message,
+        conversation_data: undefined,
+        clienteId: tenantId,
+      });
 
       // Enviar resposta
       if (agentResponse && agentResponse.response) {
-        await this.sendMessage(message.from, agentResponse.response, tenantId);
+        // Verificar se deve enviar áudio
+        const shouldUseAudio = await this.shouldUseAudio(tenantId, message.type, message.message);
+        
+        if (shouldUseAudio) {
+          await this.sendAudioMessage(message.from, agentResponse.response, tenantId!);
+        } else {
+          await this.sendMessage(message.from, agentResponse.response, tenantId);
+        }
       }
     } catch (error: any) {
       this.fastify.log.error({ error }, 'Erro ao processar mensagem Z-API');
@@ -290,15 +298,77 @@ export class ZApiService {
   }
 
   /**
+   * Verifica se deve usar áudio baseado na configuração de voz
+   */
+  private async shouldUseAudio(
+    tenantId: string | undefined,
+    inputType: 'text' | 'audio' | 'image' | 'video' | 'document',
+    messageText: string
+  ): Promise<boolean> {
+    if (!tenantId) return false;
+
+    try {
+      const voiceConfig = await this.prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
+
+      if (!voiceConfig || !voiceConfig.enabled || !voiceConfig.elevenlabsApiKey) {
+        return false;
+      }
+
+      const mappedInputType: 'text' | 'audio' | 'media' = 
+        inputType === 'audio' ? 'audio' : 
+        (inputType === 'image' || inputType === 'video' || inputType === 'document') ? 'media' : 
+        'text';
+
+      return this.elevenlabsService.shouldRespondWithAudio(
+        {
+          enabled: voiceConfig.enabled,
+          audioResponseProbabilityOnText: voiceConfig.audioResponseProbabilityOnText,
+          audioResponseProbabilityOnAudio: voiceConfig.audioResponseProbabilityOnAudio,
+          audioResponseProbabilityOnMedia: voiceConfig.audioResponseProbabilityOnMedia,
+          textOnlyKeywords: (voiceConfig.textOnlyKeywords as string[]) || [],
+        },
+        mappedInputType,
+        messageText
+      );
+    } catch (error: any) {
+      this.fastify.log.error({ error, tenantId }, 'Erro ao verificar configuração de voz');
+      return false;
+    }
+  }
+
+  /**
    * Envia mensagem de áudio via Z-API
    */
   private async sendAudioMessage(
     to: string,
     text: string,
-    voiceConfig: any,
     tenantId: string
   ): Promise<void> {
     try {
+      // Buscar configuração de voz
+      const voiceConfig = await this.prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
+
+      if (!voiceConfig || !voiceConfig.enabled || !voiceConfig.elevenlabsApiKey) {
+        this.fastify.log.warn({ tenantId }, 'Voz não configurada. Enviando texto.');
+        await this.sendMessage(to, text, tenantId);
+        return;
+      }
+
+      // Validar duração máxima
+      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
+      if (estimatedDuration > voiceConfig.maxAudioDuration) {
+        this.fastify.log.warn(
+          { estimatedDuration, maxDuration: voiceConfig.maxAudioDuration },
+          'Texto muito longo para áudio. Enviando texto.'
+        );
+        await this.sendMessage(to, text, tenantId);
+        return;
+      }
+
       // Gerar áudio com ElevenLabs
       const audioResult = await this.elevenlabsService.generateVoice(
         voiceConfig.elevenlabsApiKey,
