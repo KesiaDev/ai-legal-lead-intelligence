@@ -132,16 +132,30 @@ export class ZApiService {
 
       if (!tenantId) {
         // Tentar identificar pelo número de telefone
-        const lead = await this.prisma.lead.findFirst({
+        const existingLead = await this.prisma.lead.findFirst({
           where: { phone: message.from },
           include: { tenant: true },
         });
 
-        if (lead) {
-          tenantId = lead.tenantId;
+        if (existingLead) {
+          tenantId = existingLead.tenantId;
         } else {
-          this.fastify.log.warn({ phone: message.from }, 'Lead não encontrado para número');
-          return;
+          // Se não encontrar lead, criar um tenant padrão ou usar o primeiro tenant disponível
+          // Para SaaS multi-tenant, precisamos de uma forma de identificar o tenant
+          // Por enquanto, vamos criar um tenant temporário ou usar um padrão
+          // TODO: Implementar lógica para identificar tenant baseado em configuração
+          this.fastify.log.warn({ phone: message.from }, 'Lead não encontrado, tentando criar com tenant padrão');
+          
+          // Buscar primeiro tenant disponível (para desenvolvimento/teste)
+          // Em produção, isso deve ser configurado via webhook ou header
+          const firstTenant = await this.prisma.tenant.findFirst();
+          if (firstTenant) {
+            tenantId = firstTenant.id;
+            this.fastify.log.info({ tenantId, phone: message.from }, 'Usando tenant padrão para novo lead');
+          } else {
+            this.fastify.log.error({ phone: message.from }, 'Nenhum tenant encontrado. Não é possível criar lead.');
+            return;
+          }
         }
       }
 
