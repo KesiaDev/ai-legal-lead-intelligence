@@ -32,20 +32,21 @@ export function AgentConfigSection() {
   // Buscar integrações do backend
   useEffect(() => {
     const loadIntegrations = async () => {
+      // Sempre definir canais padrão primeiro
+      const defaultChannels: CommunicationChannel[] = [
+        { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+        { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
+        { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+      ];
+      
+      let newChannels: CommunicationChannel[] = [...defaultChannels];
+      
       try {
         const response = await api.get('/api/integrations');
         const config = response.data;
         
-        const defaultChannels: CommunicationChannel[] = [
-          { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-          { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
-          { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-        ];
-        
-        const newChannels: CommunicationChannel[] = [...defaultChannels];
-        
         // Adicionar Z-API se configurada
-        if (config?.zapiInstanceId && config?.zapiToken) {
+        if (config && config.zapiInstanceId && config.zapiToken) {
           newChannels.push({
             id: 'zapi-whatsapp',
             name: 'WhatsApp - Z-API',
@@ -54,11 +55,12 @@ export function AgentConfigSection() {
             status: 'connected',
           });
         }
-        
-        setChannels(newChannels);
       } catch (error) {
         console.error('Erro ao carregar integrações:', error);
-        // Manter canais padrão em caso de erro
+        // Em caso de erro, manter apenas os canais padrão
+      } finally {
+        // Sempre definir os canais, mesmo se houver erro
+        setChannels(newChannels);
       }
     };
     
