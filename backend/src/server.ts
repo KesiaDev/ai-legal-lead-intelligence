@@ -470,6 +470,53 @@ async function build() {
   await registerCrmRoutes(fastify);
 
   // ======================================================
+  // ENDPOINT TEMPORÁRIO: REGENERAR PRISMA CLIENT
+  // ⚠️ REMOVER DEPOIS DE RESOLVER O PROBLEMA
+  // Chave secreta temporária: fix-migration-2026
+  // ======================================================
+  fastify.post('/api/regenerate-prisma', async (request, reply) => {
+    try {
+      const { secret } = request.body as { secret?: string };
+      
+      if (secret !== 'fix-migration-2026') {
+        return reply.status(401).send({ error: 'Chave secreta inválida' });
+      }
+
+      const { execSync } = require('child_process');
+      
+      fastify.log.info('Regenerando Prisma Client...');
+      
+      try {
+        execSync('npx prisma generate', { 
+          cwd: __dirname + '/..',
+          stdio: 'inherit',
+          timeout: 30000 
+        });
+        
+        fastify.log.info('Prisma Client regenerado com sucesso');
+        
+        return reply.send({
+          success: true,
+          message: 'Prisma Client regenerado. Reinicie o backend para aplicar as mudanças.',
+        });
+      } catch (execError: any) {
+        fastify.log.error({ error: execError }, 'Erro ao regenerar Prisma Client');
+        return reply.status(500).send({
+          error: 'Erro ao regenerar Prisma Client',
+          message: execError.message || 'Erro desconhecido',
+        });
+      }
+    } catch (err: unknown) {
+      fastify.log.error(err);
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido';
+      return reply.status(500).send({
+        error: 'Erro ao regenerar Prisma Client',
+        message: errorMessage,
+      });
+    }
+  });
+
+  // ======================================================
   // ENDPOINT TEMPORÁRIO: APLICAR MIGRATIONS MANUALMENTE
   // ⚠️ REMOVER DEPOIS DE APLICAR AS MIGRATIONS
   // Chave secreta temporária: fix-migration-2026

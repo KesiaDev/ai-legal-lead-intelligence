@@ -245,13 +245,41 @@ export function IntegrationsSettings() {
         if (errorCount > 0) {
           description += `❌ ${errorCount} erro(s). Veja o console (F12) para detalhes. `;
         }
-        description += 'Recarregue a página manualmente (F5).';
+        description += 'Aguarde 30 segundos e tente salvar novamente. Se não funcionar, reinicie o backend no Railway.';
         
         toast({
           title: successCount > 0 || skippedCount > 0 ? '✅ Migration aplicada!' : '⚠️ Migration com problemas',
           description: description,
           variant: errorCount > 0 && successCount === 0 ? 'destructive' : 'default',
         });
+        
+        // Aguardar 30 segundos e tentar regenerar Prisma Client
+        setTimeout(async () => {
+          try {
+            console.log('🔄 Tentando regenerar Prisma Client...');
+            const regenerateResponse = await fetch('https://api.sdrjuridico.com.br/api/regenerate-prisma', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ secret: 'fix-migration-2026' }),
+            });
+            
+            const regenerateData = await regenerateResponse.json();
+            
+            if (regenerateData.success) {
+              console.log('✅ Prisma Client regenerado!');
+              toast({
+                title: '✅ Prisma Client regenerado!',
+                description: 'Agora você pode tentar salvar novamente. Se ainda não funcionar, reinicie o backend no Railway.',
+                variant: 'default',
+              });
+            } else {
+              console.warn('⚠️ Não foi possível regenerar Prisma Client automaticamente');
+            }
+          } catch (regenerateError) {
+            console.warn('⚠️ Erro ao regenerar Prisma Client:', regenerateError);
+            // Não mostrar erro para o usuário, apenas logar
+          }
+        }, 30000); // 30 segundos
         
         // Não recarregar automaticamente - deixar o usuário recarregar manualmente
         // Isso dá tempo para ver a mensagem e entender o que aconteceu
