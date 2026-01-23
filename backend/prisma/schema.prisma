@@ -29,6 +29,7 @@ model Tenant {
   agentPrompts    AgentPrompt[]
   voiceConfigs    VoiceConfig[]
   integrationConfig IntegrationConfig?
+  agentConfig     AgentConfig?
 
   @@index([plan])
 }
@@ -411,4 +412,62 @@ model IntegrationConfig {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+}
+
+////////////////////
+// AGENT CONFIG   //
+////////////////////
+
+model AgentConfig {
+  id String @id @default(uuid())
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Configurações básicas do agente
+  name        String
+  description String? @db.Text
+  isActive    Boolean @default(true)
+
+  // Configurações de comunicação
+  communicationConfig Json? // bufferLatency, timeBetweenMessages, errorMessage
+
+  // Configurações de follow-up
+  followUpConfig Json? // businessHours, etc.
+
+  // Configurações de agendamento
+  scheduleConfig Json?
+
+  // Configurações de humanização
+  humanizationConfig Json?
+
+  // Base de conhecimento
+  knowledgeBase Json? // Array de itens
+
+  // Intenções
+  intentions Json? // Array de intenções
+
+  // Templates
+  templates Json? // Array de templates
+
+  // Funnel stages
+  funnelStages Json?
+
+  // Lawyers
+  lawyers Json?
+
+  // Rotation rules
+  rotationRules Json?
+
+  // Reminders
+  reminders Json?
+
+  // Event config
+  eventConfig Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
 }

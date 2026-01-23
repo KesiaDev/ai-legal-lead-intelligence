@@ -474,12 +474,54 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [reminders, setReminders] = useState<ReminderConfig[]>(DEFAULT_REMINDERS);
   const [eventConfig, setEventConfig] = useState<EventConfig>(DEFAULT_EVENT_CONFIG);
 
-  const updateAgent = (updates: Partial<AgentConfig>) => {
-    setAgent(prev => ({ ...prev, ...updates, updatedAt: new Date() }));
+  const updateAgent = async (updates: Partial<AgentConfig>) => {
+    const newAgent = { ...agent, ...updates, updatedAt: new Date() };
+    setAgent(newAgent);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newAgent.name,
+          description: newAgent.description,
+          isActive: newAgent.isActive,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações do agente:', error);
+    }
   };
 
-  const updateCommunication = (updates: Partial<CommunicationConfig>) => {
-    setCommunication(prev => ({ ...prev, ...updates }));
+  const updateCommunication = async (updates: Partial<CommunicationConfig>) => {
+    const newCommunication = { ...communication, ...updates };
+    setCommunication(newCommunication);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          communicationConfig: newCommunication,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações de comunicação:', error);
+    }
   };
 
   const addPrompt = async (prompt: AgentPrompt) => {
@@ -549,28 +591,148 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setKnowledgeBase(prev => prev.filter(item => item.id !== id));
   };
 
-  const updateFollowUpConfig = (updates: Partial<FollowUpConfig>) => {
-    setFollowUpConfig(prev => ({ ...prev, ...updates }));
+  const updateFollowUpConfig = async (updates: Partial<FollowUpConfig>) => {
+    const newConfig = { ...followUpConfig, ...updates };
+    setFollowUpConfig(newConfig);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          followUpConfig: newConfig,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações de follow-up:', error);
+    }
   };
 
-  const updateScheduleConfig = (updates: Partial<ScheduleConfig>) => {
-    setScheduleConfig(prev => ({ ...prev, ...updates }));
+  const updateScheduleConfig = async (updates: Partial<ScheduleConfig>) => {
+    const newConfig = { ...scheduleConfig, ...updates };
+    setScheduleConfig(newConfig);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          scheduleConfig: newConfig,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações de agendamento:', error);
+    }
   };
 
-  const addIntention = (intention: Intention) => {
-    setIntentions(prev => [...prev, intention]);
+  const addIntention = async (intention: Intention) => {
+    const newIntentions = [...intentions, intention];
+    setIntentions(newIntentions);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          intentions: newIntentions,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar intenções:', error);
+    }
   };
 
-  const updateIntention = (id: string, updates: Partial<Intention>) => {
-    setIntentions(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  const updateIntention = async (id: string, updates: Partial<Intention>) => {
+    const newIntentions = intentions.map(i => i.id === id ? { ...i, ...updates } : i);
+    setIntentions(newIntentions);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          intentions: newIntentions,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar intenções:', error);
+    }
   };
 
-  const deleteIntention = (id: string) => {
-    setIntentions(prev => prev.filter(i => i.id !== id));
+  const deleteIntention = async (id: string) => {
+    const newIntentions = intentions.filter(i => i.id !== id);
+    setIntentions(newIntentions);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          intentions: newIntentions,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar intenções:', error);
+    }
   };
 
-  const updateHumanizationConfig = (updates: Partial<HumanizationConfig>) => {
-    setHumanizationConfig(prev => ({ ...prev, ...updates }));
+  const updateHumanizationConfig = async (updates: Partial<HumanizationConfig>) => {
+    const newConfig = { ...humanizationConfig, ...updates };
+    setHumanizationConfig(newConfig);
+    
+    // Salvar no backend
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      await fetch(`${API_URL}/api/agent/config`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          humanizationConfig: newConfig,
+        }),
+      });
+    } catch (error) {
+      console.error('Erro ao salvar configurações de humanização:', error);
+    }
   };
 
   const updateVoiceConfig = async (updates: Partial<VoiceConfig>) => {

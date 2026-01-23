@@ -93,8 +93,13 @@ export function AgentConfigSection() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Simular salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Salvar todas as configurações do agente
+      await updateAgent({
+        name: agent.name,
+        description: agent.description,
+        isActive: agent.isActive,
+      });
+      
       toast({
         title: 'Configurações salvas!',
         description: 'As configurações do agente foram atualizadas com sucesso.',
