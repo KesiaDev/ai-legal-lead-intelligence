@@ -488,6 +488,7 @@ async function build() {
       
       // Aplicar migrations pendentes
       const migrations = [
+        path.join(__dirname, '../prisma/migrations/20250124000000_add_integration_config/migration.sql'),
         path.join(__dirname, '../prisma/migrations/20250125000000_add_agent_config/migration.sql'),
       ];
       
