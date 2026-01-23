@@ -303,7 +303,35 @@ export function IntegrationsSettings() {
                     type="password"
                     placeholder="sk-..."
                     value={formData.openaiApiKey || ''}
-                    onChange={(e) => setFormData({ ...formData, openaiApiKey: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, openaiApiKey: newValue });
+                      
+                      // Auto-save após 2 segundos sem digitar
+                      if (autoSaveTimeout) {
+                        clearTimeout(autoSaveTimeout);
+                      }
+                      
+                      const timeout = setTimeout(async () => {
+                        if (newValue && newValue.length > 10) {
+                          try {
+                            await api.patch('/api/integrations', {
+                              openaiApiKey: newValue,
+                            });
+                            toast({
+                              title: 'Salvo automaticamente!',
+                              description: 'A chave da OpenAI foi salva automaticamente.',
+                              variant: 'default',
+                            });
+                          } catch (err: any) {
+                            // Silenciosamente falha - usuário pode salvar manualmente depois
+                            console.log('Auto-save falhou (pode ser migration pendente):', err.message);
+                          }
+                        }
+                      }, 2000);
+                      
+                      setAutoSaveTimeout(timeout);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     Obtenha sua API key em{' '}
