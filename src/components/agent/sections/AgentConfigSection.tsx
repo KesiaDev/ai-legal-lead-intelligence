@@ -27,11 +27,7 @@ export function AgentConfigSection() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [is24_7, setIs24_7] = useState(false);
-  const [channels, setChannels] = useState<CommunicationChannel[]>([
-    { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-    { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
-    { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
-  ]);
+  const [channels, setChannels] = useState<CommunicationChannel[]>([]);
 
   // Buscar integrações do backend
   useEffect(() => {
@@ -40,10 +36,13 @@ export function AgentConfigSection() {
         const response = await api.get('/api/integrations');
         const config = response.data;
         
-        const newChannels: CommunicationChannel[] = [];
+        const defaultChannels: CommunicationChannel[] = [
+          { id: '1', name: 'Disparador Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+          { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
+          { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
+        ];
         
-        // Adicionar canais existentes (Chatguru, ManyChat)
-        newChannels.push(...channels.filter(c => c.type !== 'zapi'));
+        const newChannels: CommunicationChannel[] = [...defaultChannels];
         
         // Adicionar Z-API se configurada
         if (config?.zapiInstanceId && config?.zapiToken) {
