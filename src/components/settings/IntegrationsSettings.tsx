@@ -339,6 +339,41 @@ export function IntegrationsSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Botão para aplicar migration se houver erro 500 */}
+      <Card className="border-yellow-200 bg-yellow-50">
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-yellow-900">Migration Pendente</p>
+                <p className="text-sm text-yellow-800 mt-1">
+                  Se você está vendo erros 500, a migration do banco de dados precisa ser aplicada.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={applyMigration}
+              disabled={isApplyingMigration}
+              variant="default"
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              {isApplyingMigration ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Aplicando...
+                </>
+              ) : (
+                <>
+                  <Database className="w-4 h-4 mr-2" />
+                  Aplicar Migration
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="openai" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="openai">OpenAI</TabsTrigger>
