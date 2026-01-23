@@ -485,27 +485,35 @@ async function build() {
 
       const fs = require('fs');
       const path = require('path');
-      // Tentar primeiro o arquivo direto, depois o safe
-      let sqlPath = path.join(__dirname, '../fix-migration-direct.sql');
-      if (!fs.existsSync(sqlPath)) {
-        sqlPath = path.join(__dirname, '../prisma/migrations/20250120000000_add_pipelines_and_deals/migration_safe.sql');
-      }
       
-      if (!fs.existsSync(sqlPath)) {
-        return reply.status(404).send({ error: 'Arquivo SQL não encontrado' });
-      }
+      // Aplicar migrations pendentes
+      const migrations = [
+        path.join(__dirname, '../prisma/migrations/20250125000000_add_agent_config/migration.sql'),
+      ];
+      
+      const allResults = [];
+      
+      for (const migrationPath of migrations) {
+        if (!fs.existsSync(migrationPath)) {
+          allResults.push({ 
+            migration: path.basename(migrationPath), 
+            status: 'skipped', 
+            reason: 'arquivo não encontrado' 
+          });
+          continue;
+        }
 
-      const sql = fs.readFileSync(sqlPath, 'utf-8');
-      const commands = sql
-        .split(';')
-        .map(cmd => cmd.trim())
-        .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
+        const sql = fs.readFileSync(migrationPath, 'utf-8');
+        const commands = sql
+          .split(';')
+          .map(cmd => cmd.trim())
+          .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
 
         for (const command of commands) {
           if (command.length > 0) {
             try {
               await prisma.$executeRawUnsafe(command);
-              results.push({ 
+              allResults.push({ 
                 migration: path.basename(migrationPath),
                 status: 'success', 
                 command: command.substring(0, 80) + '...' 
@@ -515,14 +523,14 @@ async function build() {
                   error.message.includes('does not exist') ||
                   error.message.includes('duplicate') ||
                   error.message.includes('constraint')) {
-                results.push({ 
+                allResults.push({ 
                   migration: path.basename(migrationPath),
                   status: 'skipped', 
                   command: command.substring(0, 80) + '...', 
                   reason: 'already exists' 
                 });
               } else {
-                results.push({ 
+                allResults.push({ 
                   migration: path.basename(migrationPath),
                   status: 'error', 
                   command: command.substring(0, 80) + '...', 
@@ -537,7 +545,7 @@ async function build() {
       return reply.send({
         success: true,
         message: 'Migrations aplicadas',
-        results,
+        results: allResults,
       });
     } catch (err: unknown) {
       fastify.log.error(err);
