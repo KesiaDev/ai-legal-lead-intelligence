@@ -27,6 +27,7 @@ model Tenant {
   deals           Deal[]
   crmIntegrations CrmIntegration[]
   agentPrompts    AgentPrompt[]
+  voiceConfigs    VoiceConfig[]
 
   @@index([plan])
 }
@@ -326,4 +327,55 @@ model AgentPrompt {
   @@index([type])
   @@index([status])
   @@index([tenantId, type, status])
+}
+
+////////////////////
+// VOICE CONFIG   //
+////////////////////
+
+model VoiceConfig {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Provider de voz
+  provider String @default("elevenlabs") // elevenlabs | google | azure | none
+  
+  // API Key do ElevenLabs
+  elevenlabsApiKey String?
+  
+  // ID da voz selecionada
+  voiceId   String
+  voiceName String
+  
+  // Probabilidades de resposta em áudio
+  audioResponseProbabilityOnText  String @default("nunca") // nunca | baixa | media | alta | sempre
+  audioResponseProbabilityOnAudio String @default("alta")
+  audioResponseProbabilityOnMedia String @default("baixa")
+  
+  // Duração máxima do áudio em segundos
+  maxAudioDuration Int @default(60)
+  
+  // Ajuste de texto para linguagem falada
+  textToSpeechAdjustment String @default("moderado") // desativado | pouco | moderado
+  
+  // Palavras que forçam resposta em texto (JSON array)
+  textOnlyKeywords Json? @default("[]")
+  
+  // Configurações de voz (ElevenLabs)
+  voiceStability      Float @default(0.5)
+  voiceSimilarityBoost Float @default(0.75)
+  voiceStyle          Float @default(0.3)
+  voiceSpeed          Float @default(1.0)
+  
+  // Ativado/desativado
+  enabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId])
+  @@index([tenantId])
+  @@index([enabled])
 }

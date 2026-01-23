@@ -13,6 +13,7 @@ import { registerPipelineRoutes } from './api/pipelines/routes';
 import { registerCrmRoutes } from './api/crm/routes';
 import { registerWhatsAppRoutes } from './api/whatsapp.routes';
 import { registerPromptsRoutes } from './api/prompts.routes';
+import { registerVoiceRoutes } from './api/voice.routes';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';

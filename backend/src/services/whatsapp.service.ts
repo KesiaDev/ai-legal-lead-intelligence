@@ -10,8 +10,10 @@
 
 import axios from 'axios';
 import { FastifyInstance } from 'fastify';
+import { PrismaClient } from '@prisma/client';
 import { getOrCreateTenantByClienteId } from '../utils/tenant';
 import { AgentService } from './agent.service';
+import { ElevenLabsService } from './elevenlabs.service';
 
 export interface WhatsAppMessage {
   from: string; // Número do remetente
@@ -57,14 +59,18 @@ export class WhatsAppService {
   private evolutionApiKey: string;
   private evolutionInstance: string;
   private agentService: AgentService;
+  private elevenlabsService: ElevenLabsService;
   private fastify: FastifyInstance;
+  private prisma: PrismaClient;
 
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;
+    this.prisma = fastify.prisma as PrismaClient;
     this.evolutionApiUrl = process.env.EVOLUTION_API_URL || '';
     this.evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
     this.evolutionInstance = process.env.EVOLUTION_INSTANCE || '';
     this.agentService = new AgentService(fastify);
+    this.elevenlabsService = new ElevenLabsService(fastify);
 
     // Validar configuração
     if (!this.evolutionApiUrl || !this.evolutionApiKey || !this.evolutionInstance) {
@@ -185,7 +191,14 @@ export class WhatsAppService {
 
       // Enviar resposta via WhatsApp
       if (agentResponse.response) {
-        await this.sendMessage(message.from, agentResponse.response);
+        // Verificar se deve enviar resposta em áudio
+        const shouldUseAudio = await this.shouldUseAudio(tenantId, message.type, message.message);
+        
+        if (shouldUseAudio) {
+          await this.sendAudioMessage(message.from, agentResponse.response, tenantId || '');
+        } else {
+          await this.sendMessage(message.from, agentResponse.response);
+        }
       }
 
     } catch (error: any) {
@@ -205,10 +218,9 @@ export class WhatsAppService {
     message: WhatsAppMessage,
     tenantId?: string
   ): Promise<string> {
-    const { prisma } = this.fastify;
 
     // Buscar lead existente pelo telefone
-    const existingLead = await prisma.lead.findFirst({
+    const existingLead = await this.prisma.lead.findFirst({
       where: {
         phone: message.from,
         ...(tenantId && { tenantId }),
@@ -220,7 +232,7 @@ export class WhatsAppService {
 
     if (existingLead) {
       // Atualizar lead existente
-      await prisma.lead.update({
+      await this.prisma.lead.update({
         where: { id: existingLead.id },
         data: {
           updatedAt: new Date(),
@@ -228,7 +240,7 @@ export class WhatsAppService {
       });
 
       // Criar mensagem no histórico
-      await prisma.message.create({
+      await this.prisma.message.create({
         data: {
           leadId: existingLead.id,
           content: message.message,
@@ -240,7 +252,7 @@ export class WhatsAppService {
       return existingLead.id;
     } else {
       // Criar novo lead
-      const newLead = await prisma.lead.create({
+      const newLead = await this.prisma.lead.create({
         data: {
           name: message.from, // Nome temporário
           phone: message.from,
@@ -251,17 +263,172 @@ export class WhatsAppService {
         },
       });
 
-      // Criar mensagem inicial
-      await prisma.message.create({
+      // Criar conversa
+      const conversation = await this.prisma.conversation.create({
         data: {
+          tenantId: newLead.tenantId,
           leadId: newLead.id,
+          channel: 'whatsapp',
+          assignedType: 'ai',
+          status: 'active',
+        },
+      });
+
+      // Criar mensagem inicial
+      await this.prisma.message.create({
+        data: {
+          conversationId: conversation.id,
           content: message.message,
           senderType: 'lead',
-          channel: 'whatsapp',
         },
       });
 
       return newLead.id;
+    }
+  }
+
+  /**
+   * Verifica se deve usar áudio baseado na configuração de voz
+   */
+  private async shouldUseAudio(
+    tenantId: string | undefined,
+    inputType: 'text' | 'audio' | 'image' | 'video' | 'document',
+    messageText: string
+  ): Promise<boolean> {
+    if (!tenantId) return false;
+
+    try {
+      const voiceConfig = await this.prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
+
+      if (!voiceConfig || !voiceConfig.enabled || !voiceConfig.elevenlabsApiKey) {
+        return false;
+      }
+
+      const mappedInputType: 'text' | 'audio' | 'media' = 
+        inputType === 'audio' ? 'audio' : 
+        (inputType === 'image' || inputType === 'video' || inputType === 'document') ? 'media' : 
+        'text';
+
+      return this.elevenlabsService.shouldRespondWithAudio(
+        {
+          enabled: voiceConfig.enabled,
+          audioResponseProbabilityOnText: voiceConfig.audioResponseProbabilityOnText,
+          audioResponseProbabilityOnAudio: voiceConfig.audioResponseProbabilityOnAudio,
+          audioResponseProbabilityOnMedia: voiceConfig.audioResponseProbabilityOnMedia,
+          textOnlyKeywords: (voiceConfig.textOnlyKeywords as string[]) || [],
+        },
+        mappedInputType,
+        messageText
+      );
+    } catch (error: any) {
+      this.fastify.log.error({ error, tenantId }, 'Erro ao verificar configuração de voz');
+      return false;
+    }
+  }
+
+  /**
+   * Envia mensagem de áudio via Evolution API
+   */
+  async sendAudioMessage(
+    to: string,
+    text: string,
+    tenantId: string
+  ): Promise<void> {
+    if (!this.evolutionApiUrl || !this.evolutionApiKey || !this.evolutionInstance) {
+      this.fastify.log.warn('Evolution API não configurada. Mensagem de áudio não enviada.');
+      return;
+    }
+
+    try {
+      // Buscar configuração de voz
+      const voiceConfig = await this.prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
+
+      if (!voiceConfig || !voiceConfig.enabled || !voiceConfig.elevenlabsApiKey) {
+        this.fastify.log.warn({ tenantId }, 'Voz não configurada. Enviando texto.');
+        await this.sendMessage(to, text);
+        return;
+      }
+
+      // Validar duração máxima
+      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
+      if (estimatedDuration > voiceConfig.maxAudioDuration) {
+        this.fastify.log.warn(
+          { estimatedDuration, maxDuration: voiceConfig.maxAudioDuration },
+          'Texto muito longo para áudio. Enviando texto.'
+        );
+        await this.sendMessage(to, text);
+        return;
+      }
+
+      // Gerar áudio com ElevenLabs
+      const audioResult = await this.elevenlabsService.generateVoice(
+        voiceConfig.elevenlabsApiKey,
+        {
+          text,
+          voiceId: voiceConfig.voiceId,
+          settings: {
+            stability: voiceConfig.voiceStability,
+            similarityBoost: voiceConfig.voiceSimilarityBoost,
+            style: voiceConfig.voiceStyle,
+            speed: voiceConfig.voiceSpeed,
+          },
+        }
+      );
+
+      if (!audioResult.success || !audioResult.audioBuffer) {
+        this.fastify.log.warn(
+          { error: audioResult.error },
+          'Erro ao gerar áudio. Enviando texto.'
+        );
+        await this.sendMessage(to, text);
+        return;
+      }
+
+      // Converter buffer para base64
+      const audioBase64 = audioResult.audioBuffer.toString('base64');
+
+      // Enviar áudio via Evolution API
+      const instanceEncoded = encodeURIComponent(this.evolutionInstance);
+      const url = `${this.evolutionApiUrl}/message/sendMedia/${instanceEncoded}`;
+
+      this.fastify.log.info({ to }, 'Enviando mensagem de áudio via Evolution API');
+
+      await axios.post(
+        url,
+        {
+          number: to,
+          mediatype: 'audio',
+          media: audioBase64,
+          fileName: 'audio.mp3',
+          mimetype: 'audio/mpeg',
+        },
+        {
+          headers: {
+            apikey: this.evolutionApiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000, // 30 segundos
+        }
+      );
+
+      this.fastify.log.info({ to }, 'Mensagem de áudio enviada com sucesso');
+
+    } catch (error: any) {
+      this.fastify.log.error(
+        { error: error.message, response: error.response?.data },
+        'Erro ao enviar mensagem de áudio. Tentando enviar texto.'
+      );
+      
+      // Fallback: enviar como texto
+      try {
+        await this.sendMessage(to, text);
+      } catch (textError: any) {
+        this.fastify.log.error({ error: textError }, 'Erro ao enviar mensagem de texto como fallback');
+      }
     }
   }
 
