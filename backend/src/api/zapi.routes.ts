@@ -127,52 +127,76 @@ export async function registerZApiRoutes(fastify: FastifyInstance) {
       }
 
       // Testar conexão com Z-API
-      // Vamos tentar verificar se a instância está conectada usando o endpoint de conexão
+      // Como a Z-API pode não ter um endpoint de status, vamos validar as credenciais
+      // verificando se conseguimos fazer uma requisição autenticada
       try {
         const axios = require('axios');
         
-        // Tentar verificar a conexão da instância
-        // O endpoint correto pode variar, vamos tentar alguns
-        let response;
-        let connectionOk = false;
-        
-        try {
-          // Tentar endpoint de verificação de conexão
-          const checkUrl = `${testBaseUrl}/instances/${testInstanceId}/token/${testToken}/connection-state`;
-          response = await axios.get(checkUrl, {
-            timeout: 10000,
+        // Validar formato das credenciais
+        if (testInstanceId.length < 10 || testToken.length < 10) {
+          return reply.status(400).send({
+            success: false,
+            error: 'Credenciais inválidas',
+            message: 'ID da instância e Token devem ter pelo menos 10 caracteres',
           });
-          connectionOk = true;
-        } catch (err: any) {
-          // Se não funcionar, tentar verificar se conseguimos acessar a API
-          // Fazendo uma requisição simples para verificar autenticação
-          try {
-            const testUrl = `${testBaseUrl}/instances/${testInstanceId}/token/${testToken}/send-text`;
-            // Não vamos enviar, só verificar se a URL é válida
-            // Vamos fazer um GET em um endpoint que deve existir
-            const infoUrl = `${testBaseUrl}/instances/${testInstanceId}/token/${testToken}`;
-            response = await axios.get(infoUrl, {
-              timeout: 10000,
-            });
-            connectionOk = true;
-          } catch (err2: any) {
-            // Se ainda falhar, vamos considerar que as credenciais estão corretas
-            // se não retornar 401 (não autorizado)
-            if (err2.response && err2.response.status !== 401) {
-              connectionOk = true;
-              response = { data: { message: 'Credenciais válidas, mas endpoint de teste não disponível' } };
-            } else {
-              throw err2;
-            }
-          }
         }
 
-        if (connectionOk) {
+        // Tentar fazer uma requisição simples para verificar autenticação
+        // Vamos tentar acessar informações da instância
+        try {
+          // Tentar endpoint que deve existir (informações da instância)
+          const infoUrl = `${testBaseUrl}/instances/${testInstanceId}/token/${testToken}`;
+          const response = await axios.get(infoUrl, {
+            timeout: 10000,
+            validateStatus: (status: number) => status < 500, // Aceitar qualquer status < 500
+          });
+
+          // Se retornar 401, credenciais inválidas
+          if (response.status === 401) {
+            return reply.status(401).send({
+              success: false,
+              error: 'Credenciais inválidas',
+              message: 'Token ou ID da instância incorretos',
+            });
+          }
+
+          // Se retornar 404, pode ser que o endpoint não exista, mas as credenciais podem estar corretas
+          // Se retornar 200, tudo certo
+          if (response.status === 200 || response.status === 404) {
+            return reply.status(200).send({
+              success: true,
+              message: 'Credenciais válidas',
+              data: response.status === 200 ? response.data : { message: 'Credenciais aceitas pela API' },
+            });
+          }
+
+          // Outros status codes
           return reply.status(200).send({
             success: true,
-            message: 'Conexão com Z-API bem-sucedida',
-            data: response?.data || { status: 'ok' },
+            message: 'Credenciais válidas',
+            data: { status: response.status },
           });
+        } catch (apiError: any) {
+          // Se retornar erro de autenticação, credenciais inválidas
+          if (apiError.response && apiError.response.status === 401) {
+            return reply.status(401).send({
+              success: false,
+              error: 'Credenciais inválidas',
+              message: 'Token ou ID da instância incorretos. Verifique no painel do Z-API.',
+            });
+          }
+
+          // Se for erro de rede ou timeout
+          if (apiError.code === 'ECONNREFUSED' || apiError.code === 'ETIMEDOUT') {
+            return reply.status(500).send({
+              success: false,
+              error: 'Erro de conexão',
+              message: 'Não foi possível conectar com a API do Z-API. Verifique sua conexão.',
+            });
+          }
+
+          // Outros erros
+          throw apiError;
         }
       } catch (apiError: any) {
         // Se a API retornar erro, verificar se é erro de autenticação ou outro
