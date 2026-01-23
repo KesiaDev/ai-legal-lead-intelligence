@@ -10,9 +10,6 @@ import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { PromptService } from './prompt.service';
 
-// Importar prompts da plataforma (será adaptado para backend)
-const ORCHESTRATOR_PROMPT_DEFAULT = `Você é o Super SDR Advogados, o Assistente Virtual de Pré-Vendas de um escritório de advocacia.
-
 ## PAPEL
 Você é um Super SDR (Sales Development Representative) jurídico especializado. Seu papel é:
 - Recepcionar leads com cordialidade e profissionalismo
@@ -135,7 +132,12 @@ export class AgentService {
 
     // Obter prompt do serviço de prompts (tenta banco, depois padrão)
     const promptConfig = await this.promptService.getPrompt('orquestrador', request.clienteId);
-    const systemPrompt = promptConfig?.content || ORCHESTRATOR_PROMPT_DEFAULT;
+    
+    if (!promptConfig || !promptConfig.content) {
+      throw new Error('Prompt não encontrado');
+    }
+    
+    const systemPrompt = promptConfig.content;
     const model = promptConfig?.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
     const temperature = promptConfig?.temperature ?? 0.4;
     const maxTokens = promptConfig?.maxTokens ?? 500;
