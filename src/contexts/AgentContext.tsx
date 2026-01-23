@@ -395,10 +395,11 @@ export function AgentProvider({ children }: { children: ReactNode }) {
   const [prompts, setPrompts] = useState<AgentPrompt[]>(defaultPrompts);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
 
-  // Carregar prompts do backend quando o usuário estiver autenticado
+  // Carregar prompts e configurações do backend quando o usuário estiver autenticado
   useEffect(() => {
     if (user) {
       loadPromptsFromBackend();
+      loadAgentConfigFromBackend();
     }
   }, [user]);
 
@@ -464,6 +465,95 @@ export function AgentProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Erro ao carregar configuração de voz:', error);
+    }
+  };
+
+  const loadAgentConfigFromBackend = async () => {
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_URL}/api/agent/config`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Atualizar configurações básicas do agente
+        if (data.name || data.description !== undefined || data.isActive !== undefined) {
+          setAgent(prev => ({
+            ...prev,
+            name: data.name || prev.name,
+            description: data.description !== undefined ? data.description : prev.description,
+            isActive: data.isActive !== undefined ? data.isActive : prev.isActive,
+          }));
+        }
+        
+        // Atualizar configurações de comunicação
+        if (data.communicationConfig) {
+          setCommunication(data.communicationConfig);
+        }
+        
+        // Atualizar configurações de follow-up
+        if (data.followUpConfig) {
+          setFollowUpConfig(data.followUpConfig);
+        }
+        
+        // Atualizar configurações de agendamento
+        if (data.scheduleConfig) {
+          setScheduleConfig(data.scheduleConfig);
+        }
+        
+        // Atualizar configurações de humanização
+        if (data.humanizationConfig) {
+          setHumanizationConfig(data.humanizationConfig);
+        }
+        
+        // Atualizar base de conhecimento
+        if (data.knowledgeBase && Array.isArray(data.knowledgeBase)) {
+          setKnowledgeBase(data.knowledgeBase);
+        }
+        
+        // Atualizar intenções
+        if (data.intentions && Array.isArray(data.intentions)) {
+          setIntentions(data.intentions);
+        }
+        
+        // Atualizar templates
+        if (data.templates && Array.isArray(data.templates)) {
+          setTemplates(data.templates);
+        }
+        
+        // Atualizar funnel stages
+        if (data.funnelStages && Array.isArray(data.funnelStages)) {
+          setFunnelStages(data.funnelStages);
+        }
+        
+        // Atualizar lawyers
+        if (data.lawyers && Array.isArray(data.lawyers)) {
+          setLawyers(data.lawyers);
+        }
+        
+        // Atualizar rotation rules
+        if (data.rotationRules && Array.isArray(data.rotationRules)) {
+          setRotationRules(data.rotationRules);
+        }
+        
+        // Atualizar reminders
+        if (data.reminders && Array.isArray(data.reminders)) {
+          setReminders(data.reminders);
+        }
+        
+        // Atualizar event config
+        if (data.eventConfig) {
+          setEventConfig(data.eventConfig);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao carregar configurações do agente:', error);
     }
   };
   
