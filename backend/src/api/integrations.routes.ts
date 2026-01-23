@@ -113,57 +113,72 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       }
 
       let config;
-      if (existing) {
-        // Atualizar existente
-        // IMPORTANTE: Se openaiApiKey for null explicitamente, limpar o campo
-        const updateData: any = {
-          updatedAt: new Date(),
-        };
-        
-        if (body.openaiApiKey !== undefined) {
-          updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
+      try {
+        if (existing) {
+          // Atualizar existente
+          // IMPORTANTE: Se openaiApiKey for null explicitamente, limpar o campo
+          const updateData: any = {
+            updatedAt: new Date(),
+          };
+          
+          if (body.openaiApiKey !== undefined) {
+            updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
+          }
+          if (body.n8nWebhookUrl !== undefined) {
+            updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
+          }
+          if (body.evolutionApiUrl !== undefined) {
+            updateData.evolutionApiUrl = body.evolutionApiUrl || null;
+          }
+          if (body.evolutionApiKey !== undefined) {
+            updateData.evolutionApiKey = body.evolutionApiKey || null;
+          }
+          if (body.evolutionInstance !== undefined) {
+            updateData.evolutionInstance = body.evolutionInstance || null;
+          }
+          if (body.zapiInstanceId !== undefined) {
+            updateData.zapiInstanceId = body.zapiInstanceId || null;
+          }
+          if (body.zapiToken !== undefined) {
+            updateData.zapiToken = body.zapiToken || null;
+          }
+          if (body.zapiBaseUrl !== undefined) {
+            updateData.zapiBaseUrl = body.zapiBaseUrl || null;
+          }
+          
+          config = await fastify.prisma.integrationConfig.update({
+            where: { tenantId },
+            data: updateData,
+          });
+        } else {
+          // Criar novo
+          config = await fastify.prisma.integrationConfig.create({
+            data: {
+              tenantId,
+              openaiApiKey: body.openaiApiKey || null,
+              n8nWebhookUrl: body.n8nWebhookUrl || null,
+              evolutionApiUrl: body.evolutionApiUrl || null,
+              evolutionApiKey: body.evolutionApiKey || null,
+              evolutionInstance: body.evolutionInstance || null,
+              zapiInstanceId: body.zapiInstanceId || null,
+              zapiToken: body.zapiToken || null,
+              zapiBaseUrl: body.zapiBaseUrl || null,
+            },
+          });
         }
-        if (body.n8nWebhookUrl !== undefined) {
-          updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
+      } catch (dbError: any) {
+        // Se der erro ao criar/atualizar, pode ser que a tabela ainda não foi reconhecida pelo Prisma
+        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
+          fastify.log.error({ tenantId, error: dbError.message }, 'Tabela IntegrationConfig não reconhecida pelo Prisma após migration. Tente regenerar o Prisma Client.');
+          return reply.status(503).send({
+            error: 'Tabela não reconhecida',
+            message: 'A migration foi aplicada, mas o Prisma Client precisa ser regenerado. Aguarde alguns minutos e tente novamente.',
+            suggestion: 'O backend precisa ser reiniciado para reconhecer as novas tabelas.',
+          });
         }
-        if (body.evolutionApiUrl !== undefined) {
-          updateData.evolutionApiUrl = body.evolutionApiUrl || null;
-        }
-        if (body.evolutionApiKey !== undefined) {
-          updateData.evolutionApiKey = body.evolutionApiKey || null;
-        }
-        if (body.evolutionInstance !== undefined) {
-          updateData.evolutionInstance = body.evolutionInstance || null;
-        }
-        if (body.zapiInstanceId !== undefined) {
-          updateData.zapiInstanceId = body.zapiInstanceId || null;
-        }
-        if (body.zapiToken !== undefined) {
-          updateData.zapiToken = body.zapiToken || null;
-        }
-        if (body.zapiBaseUrl !== undefined) {
-          updateData.zapiBaseUrl = body.zapiBaseUrl || null;
-        }
-        
-        config = await fastify.prisma.integrationConfig.update({
-          where: { tenantId },
-          data: updateData,
-        });
-      } else {
-        // Criar novo
-        config = await fastify.prisma.integrationConfig.create({
-          data: {
-            tenantId,
-            openaiApiKey: body.openaiApiKey || null,
-            n8nWebhookUrl: body.n8nWebhookUrl || null,
-            evolutionApiUrl: body.evolutionApiUrl || null,
-            evolutionApiKey: body.evolutionApiKey || null,
-            evolutionInstance: body.evolutionInstance || null,
-            zapiInstanceId: body.zapiInstanceId || null,
-            zapiToken: body.zapiToken || null,
-            zapiBaseUrl: body.zapiBaseUrl || null,
-          },
-        });
+        // Outros erros de banco
+        fastify.log.error({ tenantId, error: dbError }, 'Erro ao salvar IntegrationConfig');
+        throw dbError;
       }
 
       fastify.log.info({ tenantId }, 'Configurações de integração atualizadas');
