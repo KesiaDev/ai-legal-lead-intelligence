@@ -486,32 +486,114 @@ async function build() {
       const fs = require('fs');
       const path = require('path');
       
-      // Aplicar migrations pendentes
-      const migrations = [
-        path.join(__dirname, '../prisma/migrations/20250124000000_add_integration_config/migration.sql'),
-        path.join(__dirname, '../prisma/migrations/20250125000000_add_agent_config/migration.sql'),
-      ];
-      
+      // SQL direto caso os arquivos não sejam encontrados
+      const integrationConfigSQL = `
+        CREATE TABLE IF NOT EXISTS "IntegrationConfig" (
+            "id" TEXT NOT NULL,
+            "tenantId" TEXT NOT NULL,
+            "openaiApiKey" TEXT,
+            "n8nWebhookUrl" TEXT,
+            "evolutionApiUrl" TEXT,
+            "evolutionApiKey" TEXT,
+            "evolutionInstance" TEXT,
+            "zapiInstanceId" TEXT,
+            "zapiToken" TEXT,
+            "zapiBaseUrl" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL,
+            CONSTRAINT "IntegrationConfig_pkey" PRIMARY KEY ("id")
+        );
+        
+        CREATE UNIQUE INDEX IF NOT EXISTS "IntegrationConfig_tenantId_key" ON "IntegrationConfig"("tenantId");
+        CREATE INDEX IF NOT EXISTS "IntegrationConfig_tenantId_idx" ON "IntegrationConfig"("tenantId");
+        
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint 
+                WHERE conname = 'IntegrationConfig_tenantId_fkey'
+            ) THEN
+                ALTER TABLE "IntegrationConfig" 
+                ADD CONSTRAINT "IntegrationConfig_tenantId_fkey" 
+                FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            END IF;
+        END $$;
+      `;
+
+      const agentConfigSQL = `
+        CREATE TABLE IF NOT EXISTS "AgentConfig" (
+            "id" TEXT NOT NULL,
+            "tenantId" TEXT NOT NULL,
+            "name" TEXT NOT NULL,
+            "description" TEXT,
+            "isActive" BOOLEAN NOT NULL DEFAULT true,
+            "communicationConfig" JSONB,
+            "followUpConfig" JSONB,
+            "scheduleConfig" JSONB,
+            "humanizationConfig" JSONB,
+            "knowledgeBase" JSONB,
+            "intentions" JSONB,
+            "templates" JSONB,
+            "funnelStages" JSONB,
+            "lawyers" JSONB,
+            "rotationRules" JSONB,
+            "reminders" JSONB,
+            "eventConfig" JSONB,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL,
+            CONSTRAINT "AgentConfig_pkey" PRIMARY KEY ("id")
+        );
+        
+        CREATE UNIQUE INDEX IF NOT EXISTS "AgentConfig_tenantId_key" ON "AgentConfig"("tenantId");
+        CREATE INDEX IF NOT EXISTS "AgentConfig_tenantId_idx" ON "AgentConfig"("tenantId");
+        CREATE INDEX IF NOT EXISTS "AgentConfig_isActive_idx" ON "AgentConfig"("isActive");
+        
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint 
+                WHERE conname = 'AgentConfig_tenantId_fkey'
+            ) THEN
+                ALTER TABLE "AgentConfig" 
+                ADD CONSTRAINT "AgentConfig_tenantId_fkey" 
+                FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+            END IF;
+        END $$;
+      `;
+
       const allResults = [];
       
-      fastify.log.info({ migrations }, 'Iniciando aplicação de migrations');
+      // Tentar ler dos arquivos primeiro, se não encontrar, usar SQL inline
+      const migrations = [
+        {
+          name: 'IntegrationConfig',
+          path: path.join(__dirname, '../prisma/migrations/20250124000000_add_integration_config/migration.sql'),
+          fallbackSQL: integrationConfigSQL,
+        },
+        {
+          name: 'AgentConfig',
+          path: path.join(__dirname, '../prisma/migrations/20250125000000_add_agent_config/migration.sql'),
+          fallbackSQL: agentConfigSQL,
+        },
+      ];
       
-      for (const migrationPath of migrations) {
-        fastify.log.info({ migrationPath }, 'Verificando migration');
+      fastify.log.info({ migrations: migrations.map(m => m.name) }, 'Iniciando aplicação de migrations');
+      
+      for (const migration of migrations) {
+        fastify.log.info({ migration: migration.name, path: migration.path }, 'Processando migration');
         
-        if (!fs.existsSync(migrationPath)) {
-          fastify.log.warn({ migrationPath }, 'Arquivo de migration não encontrado');
-          allResults.push({ 
-            migration: path.basename(migrationPath), 
-            status: 'skipped', 
-            reason: 'arquivo não encontrado',
-            fullPath: migrationPath
-          });
-          continue;
+        let sql = '';
+        let source = 'file';
+        
+        if (fs.existsSync(migration.path)) {
+          fastify.log.info({ path: migration.path }, 'Lendo arquivo de migration');
+          sql = fs.readFileSync(migration.path, 'utf-8');
+          source = 'file';
+        } else {
+          fastify.log.warn({ path: migration.path }, 'Arquivo não encontrado, usando SQL inline');
+          sql = migration.fallbackSQL;
+          source = 'inline';
         }
-
-        fastify.log.info({ migrationPath }, 'Lendo arquivo de migration');
-        const sql = fs.readFileSync(migrationPath, 'utf-8');
         
         // Dividir por ponto e vírgula, mas manter comandos multi-linha
         const commands = sql
@@ -519,21 +601,22 @@ async function build() {
           .map(cmd => cmd.trim())
           .filter(cmd => cmd.length > 0 && !cmd.startsWith('--') && !cmd.startsWith('/*'));
 
-        fastify.log.info({ migrationPath, commandCount: commands.length }, 'Comandos SQL encontrados');
+        fastify.log.info({ migration: migration.name, commandCount: commands.length, source }, 'Comandos SQL encontrados');
 
         for (const command of commands) {
           if (command.length > 0) {
             try {
-              fastify.log.info({ command: command.substring(0, 100) }, 'Executando comando SQL');
+              fastify.log.info({ migration: migration.name, command: command.substring(0, 100) }, 'Executando comando SQL');
               await prisma.$executeRawUnsafe(command);
               allResults.push({ 
-                migration: path.basename(migrationPath),
+                migration: migration.name,
                 status: 'success', 
-                command: command.substring(0, 80) + '...' 
+                command: command.substring(0, 80) + '...',
+                source
               });
-              fastify.log.info({ command: command.substring(0, 100) }, 'Comando executado com sucesso');
+              fastify.log.info({ migration: migration.name }, 'Comando executado com sucesso');
             } catch (error: any) {
-              fastify.log.error({ error: error.message, command: command.substring(0, 100) }, 'Erro ao executar comando');
+              fastify.log.error({ error: error.message, migration: migration.name, command: command.substring(0, 100) }, 'Erro ao executar comando');
               
               // Se a tabela já existe, considerar sucesso
               if (error.message.includes('already exists') || 
@@ -541,27 +624,30 @@ async function build() {
                   error.message.includes('duplicate') ||
                   (error.message.includes('constraint') && error.message.includes('already'))) {
                 allResults.push({ 
-                  migration: path.basename(migrationPath),
+                  migration: migration.name,
                   status: 'skipped', 
                   command: command.substring(0, 80) + '...', 
                   reason: 'already exists',
-                  error: error.message
+                  error: error.message,
+                  source
                 });
-              } else if (error.message.includes('does not exist') && error.message.includes('relation')) {
-                // Se a tabela referenciada não existe, pode ser que precise criar em ordem
+              } else if (error.message.includes('does not exist') && error.message.includes('relation') && !error.message.includes('Tenant')) {
+                // Se a tabela referenciada não existe (exceto Tenant que deve existir)
                 allResults.push({ 
-                  migration: path.basename(migrationPath),
+                  migration: migration.name,
                   status: 'error', 
                   command: command.substring(0, 80) + '...', 
                   error: error.message,
-                  note: 'Tabela referenciada não existe ainda'
+                  note: 'Tabela referenciada não existe ainda',
+                  source
                 });
               } else {
                 allResults.push({ 
-                  migration: path.basename(migrationPath),
+                  migration: migration.name,
                   status: 'error', 
                   command: command.substring(0, 80) + '...', 
-                  error: error.message 
+                  error: error.message,
+                  source
                 });
               }
             }
@@ -569,7 +655,16 @@ async function build() {
         }
       }
       
-      fastify.log.info({ results: allResults }, 'Migrations aplicadas');
+      const successCount = allResults.filter(r => r.status === 'success').length;
+      const errorCount = allResults.filter(r => r.status === 'error').length;
+      const skippedCount = allResults.filter(r => r.status === 'skipped').length;
+      
+      fastify.log.info({ 
+        success: successCount, 
+        errors: errorCount, 
+        skipped: skippedCount,
+        results: allResults 
+      }, 'Migrations aplicadas');
 
       return reply.send({
         success: true,
