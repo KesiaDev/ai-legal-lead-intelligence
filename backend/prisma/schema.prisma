@@ -26,6 +26,7 @@ model Tenant {
   pipelines       Pipeline[]
   deals           Deal[]
   crmIntegrations CrmIntegration[]
+  agentPrompts    AgentPrompt[]
 
   @@index([plan])
 }
@@ -289,4 +290,40 @@ model CrmIntegration {
   @@index([tenantId])
   @@index([type])
   @@index([isActive])
+}
+
+////////////////////
+// AGENT PROMPTS  //
+////////////////////
+
+model AgentPrompt {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  type        String // orquestrador | qualificador | scheduler | resumo | followup | insights | etc.
+  version     String @default("v1.0")
+  status      String @default("ativo") // ativo | inativo
+  provider    String @default("OpenAI") // OpenAI | Google
+  model       String @default("gpt-4o-mini")
+  temperature Float? @default(0.4)
+  maxTokens   Int?   @default(500)
+  content     String @db.Text // Conteúdo do prompt
+
+  description String? @db.Text
+  objective   String? @db.Text
+  limits      Json? // Array de limites/regras
+  tone        String?
+  outputSchema String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, version])
+  @@index([tenantId])
+  @@index([type])
+  @@index([status])
+  @@index([tenantId, type, status])
 }

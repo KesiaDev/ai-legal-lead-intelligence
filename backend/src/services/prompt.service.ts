@@ -107,26 +107,48 @@ Responda APENAS em formato JSON conforme o schema:
    */
   async getPrompt(type: string, tenantId?: string): Promise<PromptConfig | null> {
     try {
-      // TODO: Buscar do banco quando tabela de prompts for criada
-      // Por enquanto, usa prompts padrão
-      
-      // Mapear tipos comuns
-      const typeMap: Record<string, string> = {
-        'orquestrador': 'orquestrador',
-        'orquestrador conversacional': 'orquestrador',
-        'agente conversacional': 'orquestrador',
-        'scheduler': 'orquestrador', // Por enquanto usa orquestrador
-        'qualifier': 'orquestrador', // Por enquanto usa orquestrador
-      };
+      // Normalizar tipo
+      const normalizedType = this.normalizePromptType(type);
 
-      const mappedType = typeMap[type.toLowerCase()] || 'orquestrador';
-      const prompt = this.defaultPrompts.get(mappedType);
+      // Se tiver tenantId, buscar do banco primeiro
+      if (tenantId) {
+        const dbPrompt = await this.prisma.agentPrompt.findFirst({
+          where: {
+            tenantId,
+            type: normalizedType,
+            status: 'ativo',
+          },
+          orderBy: {
+            version: 'desc', // Pega a versão mais recente
+          },
+        });
 
+        if (dbPrompt) {
+          this.fastify.log.info({ type: normalizedType, tenantId }, 'Prompt encontrado no banco');
+          return {
+            id: dbPrompt.id,
+            name: dbPrompt.name,
+            type: dbPrompt.type,
+            version: dbPrompt.version,
+            status: dbPrompt.status as 'ativo' | 'inativo',
+            provider: dbPrompt.provider as 'OpenAI' | 'Google',
+            model: dbPrompt.model,
+            content: dbPrompt.content,
+            temperature: dbPrompt.temperature ?? undefined,
+            maxTokens: dbPrompt.maxTokens ?? undefined,
+          };
+        }
+      }
+
+      // Se não encontrou no banco, usa prompt padrão
+      const prompt = this.defaultPrompts.get(normalizedType);
       if (prompt) {
+        this.fastify.log.debug({ type: normalizedType }, 'Usando prompt padrão');
         return prompt;
       }
 
       // Fallback para orquestrador
+      this.fastify.log.warn({ type: normalizedType }, 'Tipo de prompt não encontrado, usando orquestrador');
       return this.defaultPrompts.get('orquestrador') || null;
     } catch (error: any) {
       this.fastify.log.error({ error, type }, 'Erro ao buscar prompt');
@@ -136,18 +158,170 @@ Responda APENAS em formato JSON conforme o schema:
   }
 
   /**
-   * Salva prompt no banco (para uso futuro)
+   * Normaliza tipo de prompt para formato padrão
    */
-  async savePrompt(prompt: PromptConfig, tenantId: string): Promise<void> {
-    // TODO: Implementar quando tabela de prompts for criada
-    this.fastify.log.info({ prompt, tenantId }, 'Salvar prompt (não implementado ainda)');
+  private normalizePromptType(type: string): string {
+    const typeMap: Record<string, string> = {
+      'orquestrador': 'orquestrador',
+      'orquestrador conversacional': 'orquestrador',
+      'agente conversacional': 'orquestrador',
+      'scheduler': 'scheduler',
+      'qualifier': 'qualificador',
+      'qualificador': 'qualificador',
+      'resumo': 'resumo',
+      'conversation_summary': 'resumo',
+      'followup': 'followup',
+      'insights': 'insights',
+      'lembrete': 'lembrete',
+    };
+
+    return typeMap[type.toLowerCase()] || type.toLowerCase();
   }
 
   /**
-   * Lista todos os prompts disponíveis
+   * Salva ou atualiza prompt no banco
+   */
+  async savePrompt(prompt: PromptConfig, tenantId: string): Promise<PromptConfig> {
+    try {
+      const normalizedType = this.normalizePromptType(prompt.type);
+
+      // Verificar se já existe
+      const existing = await this.prisma.agentPrompt.findFirst({
+        where: {
+          tenantId,
+          type: normalizedType,
+          version: prompt.version,
+        },
+      });
+
+      if (existing) {
+        // Atualizar existente
+        const updated = await this.prisma.agentPrompt.update({
+          where: { id: existing.id },
+          data: {
+            name: prompt.name,
+            status: prompt.status,
+            provider: prompt.provider,
+            model: prompt.model,
+            temperature: prompt.temperature,
+            maxTokens: prompt.maxTokens,
+            content: prompt.content,
+            updatedAt: new Date(),
+          },
+        });
+
+        this.fastify.log.info({ id: updated.id, type: normalizedType }, 'Prompt atualizado no banco');
+        return {
+          id: updated.id,
+          name: updated.name,
+          type: updated.type,
+          version: updated.version,
+          status: updated.status as 'ativo' | 'inativo',
+          provider: updated.provider as 'OpenAI' | 'Google',
+          model: updated.model,
+          content: updated.content,
+          temperature: updated.temperature ?? undefined,
+          maxTokens: updated.maxTokens ?? undefined,
+        };
+      } else {
+        // Criar novo
+        const created = await this.prisma.agentPrompt.create({
+          data: {
+            tenantId,
+            name: prompt.name,
+            type: normalizedType,
+            version: prompt.version,
+            status: prompt.status,
+            provider: prompt.provider,
+            model: prompt.model,
+            temperature: prompt.temperature,
+            maxTokens: prompt.maxTokens,
+            content: prompt.content,
+          },
+        });
+
+        this.fastify.log.info({ id: created.id, type: normalizedType }, 'Prompt criado no banco');
+        return {
+          id: created.id,
+          name: created.name,
+          type: created.type,
+          version: created.version,
+          status: created.status as 'ativo' | 'inativo',
+          provider: created.provider as 'OpenAI' | 'Google',
+          model: created.model,
+          content: created.content,
+          temperature: created.temperature ?? undefined,
+          maxTokens: created.maxTokens ?? undefined,
+        };
+      }
+    } catch (error: any) {
+      this.fastify.log.error({ error, prompt, tenantId }, 'Erro ao salvar prompt');
+      throw error;
+    }
+  }
+
+  /**
+   * Lista todos os prompts disponíveis (banco + padrão)
    */
   async listPrompts(tenantId?: string): Promise<PromptConfig[]> {
-    // Por enquanto, retorna apenas prompts padrão
-    return Array.from(this.defaultPrompts.values());
+    const prompts: PromptConfig[] = [];
+
+    // Buscar do banco se tiver tenantId
+    if (tenantId) {
+      const dbPrompts = await this.prisma.agentPrompt.findMany({
+        where: {
+          tenantId,
+          status: 'ativo',
+        },
+        orderBy: [
+          { type: 'asc' },
+          { version: 'desc' },
+        ],
+      });
+
+      for (const dbPrompt of dbPrompts) {
+        prompts.push({
+          id: dbPrompt.id,
+          name: dbPrompt.name,
+          type: dbPrompt.type,
+          version: dbPrompt.version,
+          status: dbPrompt.status as 'ativo' | 'inativo',
+          provider: dbPrompt.provider as 'OpenAI' | 'Google',
+          model: dbPrompt.model,
+          content: dbPrompt.content,
+          temperature: dbPrompt.temperature ?? undefined,
+          maxTokens: dbPrompt.maxTokens ?? undefined,
+        });
+      }
+    }
+
+    // Adicionar prompts padrão que não estão no banco
+    const defaultPrompts = Array.from(this.defaultPrompts.values());
+    for (const defaultPrompt of defaultPrompts) {
+      const exists = prompts.some(p => p.type === defaultPrompt.type);
+      if (!exists) {
+        prompts.push(defaultPrompt);
+      }
+    }
+
+    return prompts;
+  }
+
+  /**
+   * Deleta prompt do banco
+   */
+  async deletePrompt(promptId: string, tenantId: string): Promise<void> {
+    try {
+      await this.prisma.agentPrompt.deleteMany({
+        where: {
+          id: promptId,
+          tenantId,
+        },
+      });
+      this.fastify.log.info({ promptId, tenantId }, 'Prompt deletado');
+    } catch (error: any) {
+      this.fastify.log.error({ error, promptId, tenantId }, 'Erro ao deletar prompt');
+      throw error;
+    }
   }
 }

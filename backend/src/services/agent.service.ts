@@ -289,18 +289,27 @@ export class AgentService {
    * Recupera histórico de conversa do banco
    */
   private async getConversationHistory(leadId: string): Promise<Array<{ role: string; content: string }>> {
-    const messages = await this.prisma.message.findMany({
+    // Buscar conversa do lead
+    const conversation = await this.prisma.conversation.findFirst({
       where: {
         leadId,
       },
-      orderBy: {
-        createdAt: 'asc',
+      include: {
+        messages: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 20, // Últimas 20 mensagens
+        },
       },
-      take: 20, // Últimas 20 mensagens
     });
 
-    return messages.map((msg) => ({
-      role: msg.senderType === 'lead' ? 'user' : msg.senderType === 'bot' ? 'bot' : 'system',
+    if (!conversation) {
+      return [];
+    }
+
+    return conversation.messages.map((msg) => ({
+      role: msg.senderType === 'lead' ? 'user' : msg.senderType === 'ai' ? 'assistant' : 'system',
       content: msg.content,
     }));
   }
@@ -309,12 +318,42 @@ export class AgentService {
    * Salva mensagem no banco
    */
   private async saveMessage(leadId: string, content: string, senderType: 'lead' | 'bot' | 'system'): Promise<void> {
+    // Buscar ou criar conversa
+    let conversation = await this.prisma.conversation.findFirst({
+      where: {
+        leadId,
+      },
+    });
+
+    if (!conversation) {
+      // Buscar lead para obter tenantId
+      const lead = await this.prisma.lead.findUnique({
+        where: { id: leadId },
+      });
+
+      if (!lead) {
+        this.fastify.log.warn({ leadId }, 'Lead não encontrado ao salvar mensagem');
+        return;
+      }
+
+      // Criar conversa
+      conversation = await this.prisma.conversation.create({
+        data: {
+          tenantId: lead.tenantId,
+          leadId,
+          channel: 'whatsapp',
+          assignedType: 'ai',
+          status: 'active',
+        },
+      });
+    }
+
+    // Salvar mensagem
     await this.prisma.message.create({
       data: {
-        leadId,
+        conversationId: conversation.id,
         content,
-        senderType,
-        channel: 'whatsapp',
+        senderType: senderType === 'bot' ? 'ai' : senderType,
       },
     });
   }

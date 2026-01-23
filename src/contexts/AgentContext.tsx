@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import {
   AgentConfig,
   CommunicationConfig,
@@ -9,6 +9,8 @@ import {
   Intention,
   BusinessHours,
 } from '@/types/agent';
+import { promptsApi } from '@/api/prompts';
+import { useAuth } from './AuthContext';
 import { HumanizationConfig, DEFAULT_HUMANIZATION_CONFIG } from '@/types/humanization';
 import { VoiceConfig, DEFAULT_VOICE_CONFIG } from '@/types/voice';
 import { MessageTemplate, DEFAULT_TEMPLATES } from '@/types/template';
@@ -387,9 +389,44 @@ const defaultIntentions: Intention[] = [
 const AgentContext = createContext<AgentContextType | undefined>(undefined);
 
 export function AgentProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [agent, setAgent] = useState<AgentConfig>(defaultAgent);
   const [communication, setCommunication] = useState<CommunicationConfig>(defaultCommunication);
   const [prompts, setPrompts] = useState<AgentPrompt[]>(defaultPrompts);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
+
+  // Carregar prompts do backend quando o usuário estiver autenticado
+  useEffect(() => {
+    if (user) {
+      loadPromptsFromBackend();
+    }
+  }, [user]);
+
+  const loadPromptsFromBackend = async () => {
+    setIsLoadingPrompts(true);
+    try {
+      const response = await promptsApi.list();
+      if (response.prompts && response.prompts.length > 0) {
+        // Converter prompts do backend para formato do frontend
+        const convertedPrompts: AgentPrompt[] = response.prompts.map(p => ({
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          version: p.version,
+          status: p.status,
+          provider: p.provider,
+          model: p.model,
+          content: p.content,
+        }));
+        setPrompts(convertedPrompts);
+      }
+    } catch (error: any) {
+      console.error('Erro ao carregar prompts do backend:', error);
+      // Se der erro, mantém os prompts padrão
+    } finally {
+      setIsLoadingPrompts(false);
+    }
+  };
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBaseItem[]>(defaultKnowledgeBase);
   const [followUpConfig, setFollowUpConfig] = useState<FollowUpConfig>(defaultFollowUp);
   const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>(defaultSchedule);
@@ -411,16 +448,59 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setCommunication(prev => ({ ...prev, ...updates }));
   };
 
-  const addPrompt = (prompt: AgentPrompt) => {
-    setPrompts(prev => [...prev, prompt]);
+  const addPrompt = async (prompt: AgentPrompt) => {
+    try {
+      // Salvar no backend
+      const savedPrompt = await promptsApi.save({
+        name: prompt.name,
+        type: prompt.type,
+        version: prompt.version,
+        status: prompt.status,
+        provider: prompt.provider,
+        model: prompt.model,
+        content: prompt.content,
+        temperature: prompt.temperature,
+        maxTokens: prompt.maxTokens,
+      });
+      
+      // Atualizar estado local com o prompt salvo (com ID do backend)
+      setPrompts(prev => [...prev, { ...prompt, id: savedPrompt.id }]);
+    } catch (error: any) {
+      console.error('Erro ao salvar prompt no backend:', error);
+      // Em caso de erro, adiciona localmente mesmo assim
+      setPrompts(prev => [...prev, prompt]);
+    }
   };
 
-  const updatePrompt = (id: string, updates: Partial<AgentPrompt>) => {
-    setPrompts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  const updatePrompt = async (id: string, updates: Partial<AgentPrompt>) => {
+    try {
+      // Atualizar no backend
+      const prompt = prompts.find(p => p.id === id);
+      if (prompt) {
+        await promptsApi.update(id, { ...prompt, ...updates });
+      }
+      
+      // Atualizar estado local
+      setPrompts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    } catch (error: any) {
+      console.error('Erro ao atualizar prompt no backend:', error);
+      // Em caso de erro, atualiza localmente mesmo assim
+      setPrompts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    }
   };
 
-  const deletePrompt = (id: string) => {
-    setPrompts(prev => prev.filter(p => p.id !== id));
+  const deletePrompt = async (id: string) => {
+    try {
+      // Deletar no backend
+      await promptsApi.delete(id);
+      
+      // Atualizar estado local
+      setPrompts(prev => prev.filter(p => p.id !== id));
+    } catch (error: any) {
+      console.error('Erro ao deletar prompt no backend:', error);
+      // Em caso de erro, remove localmente mesmo assim
+      setPrompts(prev => prev.filter(p => p.id !== id));
+    }
   };
 
   const addKnowledgeItem = (item: KnowledgeBaseItem) => {
