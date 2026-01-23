@@ -494,41 +494,67 @@ async function build() {
       
       const allResults = [];
       
+      fastify.log.info({ migrations }, 'Iniciando aplicação de migrations');
+      
       for (const migrationPath of migrations) {
+        fastify.log.info({ migrationPath }, 'Verificando migration');
+        
         if (!fs.existsSync(migrationPath)) {
+          fastify.log.warn({ migrationPath }, 'Arquivo de migration não encontrado');
           allResults.push({ 
             migration: path.basename(migrationPath), 
             status: 'skipped', 
-            reason: 'arquivo não encontrado' 
+            reason: 'arquivo não encontrado',
+            fullPath: migrationPath
           });
           continue;
         }
 
+        fastify.log.info({ migrationPath }, 'Lendo arquivo de migration');
         const sql = fs.readFileSync(migrationPath, 'utf-8');
+        
+        // Dividir por ponto e vírgula, mas manter comandos multi-linha
         const commands = sql
           .split(';')
           .map(cmd => cmd.trim())
-          .filter(cmd => cmd.length > 0 && !cmd.startsWith('--'));
+          .filter(cmd => cmd.length > 0 && !cmd.startsWith('--') && !cmd.startsWith('/*'));
+
+        fastify.log.info({ migrationPath, commandCount: commands.length }, 'Comandos SQL encontrados');
 
         for (const command of commands) {
           if (command.length > 0) {
             try {
+              fastify.log.info({ command: command.substring(0, 100) }, 'Executando comando SQL');
               await prisma.$executeRawUnsafe(command);
               allResults.push({ 
                 migration: path.basename(migrationPath),
                 status: 'success', 
                 command: command.substring(0, 80) + '...' 
               });
+              fastify.log.info({ command: command.substring(0, 100) }, 'Comando executado com sucesso');
             } catch (error: any) {
+              fastify.log.error({ error: error.message, command: command.substring(0, 100) }, 'Erro ao executar comando');
+              
+              // Se a tabela já existe, considerar sucesso
               if (error.message.includes('already exists') || 
-                  error.message.includes('does not exist') ||
+                  error.message.includes('duplicate key') ||
                   error.message.includes('duplicate') ||
-                  error.message.includes('constraint')) {
+                  (error.message.includes('constraint') && error.message.includes('already'))) {
                 allResults.push({ 
                   migration: path.basename(migrationPath),
                   status: 'skipped', 
                   command: command.substring(0, 80) + '...', 
-                  reason: 'already exists' 
+                  reason: 'already exists',
+                  error: error.message
+                });
+              } else if (error.message.includes('does not exist') && error.message.includes('relation')) {
+                // Se a tabela referenciada não existe, pode ser que precise criar em ordem
+                allResults.push({ 
+                  migration: path.basename(migrationPath),
+                  status: 'error', 
+                  command: command.substring(0, 80) + '...', 
+                  error: error.message,
+                  note: 'Tabela referenciada não existe ainda'
                 });
               } else {
                 allResults.push({ 
@@ -542,6 +568,8 @@ async function build() {
           }
         }
       }
+      
+      fastify.log.info({ results: allResults }, 'Migrations aplicadas');
 
       return reply.send({
         success: true,
