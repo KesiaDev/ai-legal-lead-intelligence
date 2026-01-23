@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAgent } from '@/contexts/AgentContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,15 +9,17 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Power, PowerOff, Save, Plus, Pencil, Trash2, Clock, X } from 'lucide-react';
+import { Power, PowerOff, Save, Plus, Pencil, Trash2, Clock, X, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/api/client';
 
 interface CommunicationChannel {
   id: string;
   name: string;
   tags: string[];
-  type: 'chatguru' | 'manychat' | 'whatsapp' | 'other';
+  type: 'chatguru' | 'manychat' | 'whatsapp' | 'zapi' | 'other';
+  status?: 'connected' | 'disconnected';
 }
 
 export function AgentConfigSection() {
@@ -30,6 +32,39 @@ export function AgentConfigSection() {
     { id: '2', name: 'Instagram - ManyChat', tags: ['ManyChat', 'messenger', 'manychat'], type: 'manychat' },
     { id: '3', name: 'Atendimento - 9092 Chatguru', tags: ['Chatguru', 'Qualquer coisa'], type: 'chatguru' },
   ]);
+
+  // Buscar integrações do backend
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      try {
+        const response = await api.get('/api/integrations');
+        const config = response.data;
+        
+        const newChannels: CommunicationChannel[] = [];
+        
+        // Adicionar canais existentes (Chatguru, ManyChat)
+        newChannels.push(...channels.filter(c => c.type !== 'zapi'));
+        
+        // Adicionar Z-API se configurada
+        if (config?.zapiInstanceId && config?.zapiToken) {
+          newChannels.push({
+            id: 'zapi-whatsapp',
+            name: 'WhatsApp - Z-API',
+            tags: ['Z-API', 'WhatsApp', 'Mensagens'],
+            type: 'zapi',
+            status: 'connected',
+          });
+        }
+        
+        setChannels(newChannels);
+      } catch (error) {
+        console.error('Erro ao carregar integrações:', error);
+        // Manter canais padrão em caso de erro
+      }
+    };
+    
+    loadIntegrations();
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -290,7 +325,15 @@ export function AgentConfigSection() {
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex-1">
-                      <p className="font-medium mb-2">{channel.name}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="font-medium">{channel.name}</p>
+                        {channel.status === 'connected' && (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Conectado
+                          </Badge>
+                        )}
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {channel.tags.map((tag, idx) => (
                           <Badge key={idx} variant="secondary" className="text-xs">
@@ -300,23 +343,39 @@ export function AgentConfigSection() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteChannel(channel.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {channel.type === 'zapi' ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Redirecionar para configurações de integrações
+                            window.location.href = '/settings?tab=integrations';
+                          }}
+                        >
+                          Configurar
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteChannel(channel.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
