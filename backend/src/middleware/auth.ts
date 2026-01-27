@@ -44,11 +44,21 @@ export async function authenticate(
     // Verifica e decodifica o token
     const decoded = request.server.jwt.verify<JWTPayload>(token);
 
+    // DEBUG: Log detalhado do token decodificado
+    request.log.info({
+      decodedId: decoded.id,
+      decodedTenantId: decoded.tenantId,
+      hasTenantId: !!decoded.tenantId,
+      route: request.routerPath,
+      method: request.method,
+    }, 'DEBUG: Token decodificado no middleware');
+
     // Validar que tenantId está presente no token
     if (!decoded.tenantId) {
       request.log.error({
         decoded,
         token: token.substring(0, 20) + '...',
+        route: request.routerPath,
       }, 'Token JWT sem tenantId');
       
       return reply.status(401).send({
@@ -62,6 +72,13 @@ export async function authenticate(
       id: decoded.id,
       tenantId: decoded.tenantId,
     };
+    
+    // DEBUG: Confirmar que request.user foi populado
+    request.log.info({
+      requestUserId: request.user.id,
+      requestUserTenantId: request.user.tenantId,
+      route: request.routerPath,
+    }, 'DEBUG: request.user populado no middleware');
   } catch (error) {
     // Token inválido ou expirado
     return reply.status(401).send({

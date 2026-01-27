@@ -190,6 +190,28 @@ export function IntegrationsSettings() {
         payload.zapiBaseUrl = formData.zapiBaseUrl && formData.zapiBaseUrl.trim() !== '' ? formData.zapiBaseUrl : null;
       }
       
+      // DEBUG: Validar token antes de enviar
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          console.log('🔑 Token antes de PATCH /api/integrations:', {
+            hasToken: !!token,
+            tenantId: payload.tenantId,
+            userId: payload.id,
+            hasTenantId: !!payload.tenantId,
+          });
+          
+          if (!payload.tenantId) {
+            console.error('❌ ERRO CRÍTICO: Token não contém tenantId!');
+          }
+        } catch (e) {
+          console.error('❌ ERRO ao validar token:', e);
+        }
+      } else {
+        console.error('❌ ERRO: Nenhum token encontrado no localStorage!');
+      }
+      
       console.log('Enviando payload para salvar integrações:', {
         ...payload,
         // Não logar valores completos de tokens por segurança

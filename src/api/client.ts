@@ -34,9 +34,35 @@ export const api = axios.create({
 // Interceptor para adicionar token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
+  
+  // DEBUG: Validar token antes de enviar
   if (token) {
+    try {
+      // Decodificar payload do JWT (sem verificar assinatura)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      console.log('🔑 Token JWT Payload:', {
+        id: payload.id,
+        tenantId: payload.tenantId,
+        hasTenantId: !!payload.tenantId,
+        exp: payload.exp,
+        iat: payload.iat,
+        url: config.url,
+        method: config.method,
+      });
+      
+      // Validar que tenantId existe
+      if (!payload.tenantId) {
+        console.error('❌ ERRO CRÍTICO: Token não contém tenantId!', payload);
+      }
+    } catch (e) {
+      console.error('❌ ERRO ao decodificar token:', e);
+    }
+    
     config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.warn('⚠️ Nenhum token encontrado no localStorage para:', config.url);
   }
+  
   return config;
 });
 
