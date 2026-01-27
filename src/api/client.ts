@@ -2,6 +2,19 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
 
+// Log para debug - verificar qual URL está sendo usada
+console.log('🔍 API Client Config:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_URL_USED: API_URL,
+  isCorrect: API_URL.includes('api.sdrjuridico.com.br') || API_URL.includes('sdrjuridico'),
+});
+
+// Verificar se está usando URL antiga e avisar
+if (API_URL.includes('sdradvogados.up.railway.app')) {
+  console.error('❌ ERRO: Frontend está usando URL antiga!', API_URL);
+  console.error('❌ Configure VITE_API_URL=https://api.sdrjuridico.com.br no Railway');
+}
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
