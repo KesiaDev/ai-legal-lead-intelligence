@@ -85,14 +85,10 @@ export class AgentService {
   }
 
   /**
-   * Obtém API key da OpenAI (variável de ambiente ou banco por tenant)
+   * Obtém API key da OpenAI (banco por tenant PRIMEIRO, depois variável de ambiente como fallback)
+   * IMPORTANTE: Prioriza banco sobre env var para permitir configuração por tenant
    */
   private async getOpenAIApiKey(leadId?: string, clienteId?: string): Promise<string | null> {
-    // Primeiro, tenta variável de ambiente (global)
-    if (process.env.OPENAI_API_KEY) {
-      return process.env.OPENAI_API_KEY;
-    }
-
     // Tentar obter tenantId do lead ou clienteId
     let tenantId: string | undefined = clienteId;
 
@@ -111,7 +107,7 @@ export class AgentService {
       }
     }
 
-    // Se tiver tenantId, busca no banco
+    // PRIORIDADE 1: Buscar no banco por tenant (permite configuração por cliente)
     if (tenantId) {
       try {
         const config = await this.prisma.integrationConfig.findUnique({
@@ -119,13 +115,24 @@ export class AgentService {
           select: { openaiApiKey: true },
         });
 
-        if (config?.openaiApiKey) {
-          this.fastify.log.info({ tenantId }, 'OpenAI API key encontrada no banco');
+        if (config?.openaiApiKey && config.openaiApiKey.trim() !== '' && config.openaiApiKey !== 'null') {
+          this.fastify.log.info({ tenantId }, 'OpenAI API key encontrada no banco (por tenant)');
           return config.openaiApiKey;
         }
-      } catch (error) {
-        this.fastify.log.warn({ error, tenantId }, 'Erro ao buscar OpenAI API key do banco');
+      } catch (error: any) {
+        // Se erro for "tabela não existe", logar mas continuar para fallback
+        if (error.message?.includes('does not exist') || error.code === 'P2021') {
+          this.fastify.log.warn({ tenantId, error: error.message }, 'Tabela IntegrationConfig não existe ainda - usando fallback');
+        } else {
+          this.fastify.log.warn({ error, tenantId }, 'Erro ao buscar OpenAI API key do banco');
+        }
       }
+    }
+
+    // PRIORIDADE 2: Fallback para variável de ambiente (global, apenas se não houver no banco)
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '' && process.env.OPENAI_API_KEY !== 'sua-chave-aqui') {
+      this.fastify.log.info('OpenAI API key encontrada em variável de ambiente (fallback global)');
+      return process.env.OPENAI_API_KEY;
     }
 
     return null;

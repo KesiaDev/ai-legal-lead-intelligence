@@ -39,26 +39,52 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       }, 'Config endpoint access - GET /api/integrations');
 
       // Buscar configuração existente
-      let config = await fastify.prisma.integrationConfig.findUnique({
-        where: { tenantId },
-      });
+      let config;
+      try {
+        config = await fastify.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se erro for "tabela não existe", retornar erro claro
+        if (dbError.message?.includes('does not exist') || dbError.code === 'P2021') {
+          fastify.log.error({ tenantId, error: dbError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe');
+          return reply.status(503).send({
+            error: 'Tabela não encontrada',
+            message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+            code: 'MIGRATION_PENDING',
+          });
+        }
+        throw dbError; // Re-throw outros erros
+      }
 
       // Se não existir, criar automaticamente com todos os campos null/default
       if (!config) {
         fastify.log.info({ tenantId }, 'Criando IntegrationConfig automaticamente para o tenant');
-        config = await fastify.prisma.integrationConfig.create({
-          data: {
-            tenantId,
-            openaiApiKey: null,
-            n8nWebhookUrl: null,
-            evolutionApiUrl: null,
-            evolutionApiKey: null,
-            evolutionInstance: null,
-            zapiInstanceId: null,
-            zapiToken: null,
-            zapiBaseUrl: 'https://api.z-api.io',
-          },
-        });
+        try {
+          config = await fastify.prisma.integrationConfig.create({
+            data: {
+              tenantId,
+              openaiApiKey: null,
+              n8nWebhookUrl: null,
+              evolutionApiUrl: null,
+              evolutionApiKey: null,
+              evolutionInstance: null,
+              zapiInstanceId: null,
+              zapiToken: null,
+              zapiBaseUrl: 'https://api.z-api.io',
+            },
+          });
+        } catch (createError: any) {
+          if (createError.message?.includes('does not exist') || createError.code === 'P2021') {
+            fastify.log.error({ tenantId, error: createError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe ao criar');
+            return reply.status(503).send({
+              error: 'Tabela não encontrada',
+              message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+              code: 'MIGRATION_PENDING',
+            });
+          }
+          throw createError;
+        }
       }
 
       // Não retornar API keys completas por segurança (apenas indicar se existe)
@@ -123,26 +149,52 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       };
 
       // Verificar se já existe configuração, criar se não existir
-      let existing = await fastify.prisma.integrationConfig.findUnique({
-        where: { tenantId },
-      });
+      let existing;
+      try {
+        existing = await fastify.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+        });
+      } catch (dbError: any) {
+        // Se erro for "tabela não existe", retornar erro claro
+        if (dbError.message?.includes('does not exist') || dbError.code === 'P2021') {
+          fastify.log.error({ tenantId, error: dbError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe no PATCH');
+          return reply.status(503).send({
+            error: 'Tabela não encontrada',
+            message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+            code: 'MIGRATION_PENDING',
+          });
+        }
+        throw dbError; // Re-throw outros erros
+      }
 
       // Garantir que sempre existe registro antes de atualizar
       if (!existing) {
         fastify.log.info({ tenantId }, 'Criando IntegrationConfig automaticamente antes de atualizar');
-        existing = await fastify.prisma.integrationConfig.create({
-          data: {
-            tenantId,
-            openaiApiKey: null,
-            n8nWebhookUrl: null,
-            evolutionApiUrl: null,
-            evolutionApiKey: null,
-            evolutionInstance: null,
-            zapiInstanceId: null,
-            zapiToken: null,
-            zapiBaseUrl: 'https://api.z-api.io',
-          },
-        });
+        try {
+          existing = await fastify.prisma.integrationConfig.create({
+            data: {
+              tenantId,
+              openaiApiKey: null,
+              n8nWebhookUrl: null,
+              evolutionApiUrl: null,
+              evolutionApiKey: null,
+              evolutionInstance: null,
+              zapiInstanceId: null,
+              zapiToken: null,
+              zapiBaseUrl: 'https://api.z-api.io',
+            },
+          });
+        } catch (createError: any) {
+          if (createError.message?.includes('does not exist') || createError.code === 'P2021') {
+            fastify.log.error({ tenantId, error: createError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe ao criar no PATCH');
+            return reply.status(503).send({
+              error: 'Tabela não encontrada',
+              message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+              code: 'MIGRATION_PENDING',
+            });
+          }
+          throw createError;
+        }
       }
 
       // Atualizar sempre um registro existente
@@ -227,17 +279,48 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         },
       });
     } catch (error: any) {
+      // Log detalhado do erro
       fastify.log.error({ 
         error: error.message, 
         stack: error.stack,
         code: error.code,
         meta: error.meta,
-        tenantId 
+        tenantId,
+        errorName: error.name,
       }, 'Erro ao salvar configurações de integração');
       
-      return reply.status(500).send({
+      // Tratamento específico para erros comuns
+      let errorMessage = error.message || 'Erro desconhecido';
+      let statusCode = 500;
+      
+      // Erro de tabela não existe (Prisma Client desatualizado)
+      if (error.message?.includes('does not exist') || 
+          error.code === 'P2021' || 
+          error.message?.includes('Unknown table') ||
+          error.meta?.target?.includes('IntegrationConfig')) {
+        statusCode = 503;
+        errorMessage = 'Tabela não encontrada. O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.';
+        fastify.log.error({ tenantId }, 'CRÍTICO: Tabela IntegrationConfig não existe - backend precisa reiniciar');
+      }
+      
+      // Erro de constraint (tenantId duplicado, etc)
+      if (error.code === 'P2002') {
+        statusCode = 409;
+        errorMessage = 'Já existe uma configuração para este tenant. Tente atualizar em vez de criar.';
+      }
+      
+      // Erro de conexão com banco
+      if (error.code === 'P1001' || error.message?.includes('connect')) {
+        statusCode = 503;
+        errorMessage = 'Erro de conexão com banco de dados. Tente novamente em alguns segundos.';
+      }
+      
+      return reply.status(statusCode).send({
         error: 'Erro ao salvar configurações',
-        message: error.message || 'Erro desconhecido',
+        message: errorMessage,
+        code: error.code || 'UNKNOWN',
+        // Não expor stack em produção
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
       });
     }
   });
