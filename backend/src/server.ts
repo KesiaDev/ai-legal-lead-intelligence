@@ -265,6 +265,80 @@ async function build() {
       },
     });
 
+    // Criar configurações padrão para o tenant
+    try {
+      // IntegrationConfig
+      await prisma.integrationConfig.upsert({
+        where: { tenantId: tenant.id },
+        update: {}, // Não atualizar se já existir (não deve acontecer)
+        create: {
+          tenantId: tenant.id,
+          openaiApiKey: null,
+          n8nWebhookUrl: null,
+          evolutionApiUrl: null,
+          evolutionApiKey: null,
+          evolutionInstance: null,
+          zapiInstanceId: null,
+          zapiToken: null,
+          zapiBaseUrl: 'https://api.z-api.io',
+        },
+      });
+
+      // AgentConfig
+      await prisma.agentConfig.upsert({
+        where: { tenantId: tenant.id },
+        update: {}, // Não atualizar se já existir (não deve acontecer)
+        create: {
+          tenantId: tenant.id,
+          name: 'Agente Padrão',
+          description: 'Configuração inicial do agente',
+          isActive: true,
+          communicationConfig: null,
+          followUpConfig: null,
+          scheduleConfig: null,
+          humanizationConfig: null,
+          knowledgeBase: null,
+          intentions: null,
+          templates: null,
+          funnelStages: null,
+          lawyers: null,
+          rotationRules: null,
+          reminders: null,
+          eventConfig: null,
+        },
+      });
+
+      // VoiceConfig
+      await prisma.voiceConfig.upsert({
+        where: { tenantId: tenant.id },
+        update: {}, // Não atualizar se já existir (não deve acontecer)
+        create: {
+          tenantId: tenant.id,
+          provider: 'elevenlabs',
+          elevenlabsApiKey: null,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL',
+          voiceName: 'Sarah - Profissional Feminina',
+          audioResponseProbabilityOnText: 'nunca',
+          audioResponseProbabilityOnAudio: 'alta',
+          audioResponseProbabilityOnMedia: 'baixa',
+          maxAudioDuration: 60,
+          textToSpeechAdjustment: 'moderado',
+          textOnlyKeywords: [],
+          voiceStability: 0.5,
+          voiceSimilarityBoost: 0.75,
+          voiceStyle: 0.3,
+          voiceSpeed: 1.0,
+          enabled: false,
+        },
+      });
+    } catch (configError: any) {
+      // Log erro mas não falhar o registro - configs serão criadas no primeiro acesso
+      fastify.log.warn({ 
+        tenantId: tenant.id, 
+        error: configError.message 
+      }, 'Erro ao criar configurações padrão no registro (serão criadas no primeiro acesso)');
+    }
+
     const token = fastify.jwt.sign({
       id: user.id,
       tenantId: tenant.id,
@@ -1594,6 +1668,80 @@ async function build() {
           updatedAt: true,
         },
       });
+
+      // Criar configurações padrão para o tenant
+      try {
+        // IntegrationConfig
+        await prisma.integrationConfig.upsert({
+          where: { tenantId: tenant.id },
+          update: {}, // Não atualizar se já existir (não deve acontecer)
+          create: {
+            tenantId: tenant.id,
+            openaiApiKey: null,
+            n8nWebhookUrl: null,
+            evolutionApiUrl: null,
+            evolutionApiKey: null,
+            evolutionInstance: null,
+            zapiInstanceId: null,
+            zapiToken: null,
+            zapiBaseUrl: 'https://api.z-api.io',
+          },
+        });
+
+        // AgentConfig
+        await prisma.agentConfig.upsert({
+          where: { tenantId: tenant.id },
+          update: {}, // Não atualizar se já existir (não deve acontecer)
+          create: {
+            tenantId: tenant.id,
+            name: 'Agente Padrão',
+            description: 'Configuração inicial do agente',
+            isActive: true,
+            communicationConfig: null,
+            followUpConfig: null,
+            scheduleConfig: null,
+            humanizationConfig: null,
+            knowledgeBase: null,
+            intentions: null,
+            templates: null,
+            funnelStages: null,
+            lawyers: null,
+            rotationRules: null,
+            reminders: null,
+            eventConfig: null,
+          },
+        });
+
+        // VoiceConfig
+        await prisma.voiceConfig.upsert({
+          where: { tenantId: tenant.id },
+          update: {}, // Não atualizar se já existir (não deve acontecer)
+          create: {
+            tenantId: tenant.id,
+            provider: 'elevenlabs',
+            elevenlabsApiKey: null,
+            voiceId: 'EXAVITQu4vr4xnSDxMaL',
+            voiceName: 'Sarah - Profissional Feminina',
+            audioResponseProbabilityOnText: 'nunca',
+            audioResponseProbabilityOnAudio: 'alta',
+            audioResponseProbabilityOnMedia: 'baixa',
+            maxAudioDuration: 60,
+            textToSpeechAdjustment: 'moderado',
+            textOnlyKeywords: [],
+            voiceStability: 0.5,
+            voiceSimilarityBoost: 0.75,
+            voiceStyle: 0.3,
+            voiceSpeed: 1.0,
+            enabled: false,
+          },
+        });
+      } catch (configError: any) {
+        // Log erro mas não falhar a criação do tenant - configs serão criadas no primeiro acesso
+        fastify.log.warn({ 
+          tenantId: tenant.id, 
+          error: configError.message 
+        }, 'Erro ao criar configurações padrão ao criar tenant (serão criadas no primeiro acesso)');
+      }
 
       return reply.status(201).send(tenant);
     } catch (err: unknown) {

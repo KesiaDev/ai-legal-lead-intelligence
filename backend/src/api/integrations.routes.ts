@@ -38,11 +38,23 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         route: request.routerPath,
       }, 'Config endpoint access - GET /api/integrations');
 
-      // Buscar configuração existente
+      // Usar upsert para garantir que sempre existe um registro
       let config;
       try {
-        config = await fastify.prisma.integrationConfig.findUnique({
+        config = await fastify.prisma.integrationConfig.upsert({
           where: { tenantId },
+          update: {}, // Não atualizar nada se já existir
+          create: {
+            tenantId,
+            openaiApiKey: null,
+            n8nWebhookUrl: null,
+            evolutionApiUrl: null,
+            evolutionApiKey: null,
+            evolutionInstance: null,
+            zapiInstanceId: null,
+            zapiToken: null,
+            zapiBaseUrl: 'https://api.z-api.io',
+          },
         });
       } catch (dbError: any) {
         // Se erro for "tabela não existe", retornar erro claro
@@ -55,36 +67,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
           });
         }
         throw dbError; // Re-throw outros erros
-      }
-
-      // Se não existir, criar automaticamente com todos os campos null/default
-      if (!config) {
-        fastify.log.info({ tenantId }, 'Criando IntegrationConfig automaticamente para o tenant');
-        try {
-          config = await fastify.prisma.integrationConfig.create({
-            data: {
-              tenantId,
-              openaiApiKey: null,
-              n8nWebhookUrl: null,
-              evolutionApiUrl: null,
-              evolutionApiKey: null,
-              evolutionInstance: null,
-              zapiInstanceId: null,
-              zapiToken: null,
-              zapiBaseUrl: 'https://api.z-api.io',
-            },
-          });
-        } catch (createError: any) {
-          if (createError.message?.includes('does not exist') || createError.code === 'P2021') {
-            fastify.log.error({ tenantId, error: createError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe ao criar');
-            return reply.status(503).send({
-              error: 'Tabela não encontrada',
-              message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
-              code: 'MIGRATION_PENDING',
-            });
-          }
-          throw createError;
-        }
       }
 
       // Não retornar API keys completas por segurança (apenas indicar se existe)
@@ -148,11 +130,22 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         zapiBaseUrl?: string;
       };
 
-      // Verificar se já existe configuração, criar se não existir
-      let existing;
+      // Garantir que sempre existe registro usando upsert antes de atualizar
       try {
-        existing = await fastify.prisma.integrationConfig.findUnique({
+        await fastify.prisma.integrationConfig.upsert({
           where: { tenantId },
+          update: {}, // Não atualizar nada ainda, só garantir que existe
+          create: {
+            tenantId,
+            openaiApiKey: null,
+            n8nWebhookUrl: null,
+            evolutionApiUrl: null,
+            evolutionApiKey: null,
+            evolutionInstance: null,
+            zapiInstanceId: null,
+            zapiToken: null,
+            zapiBaseUrl: 'https://api.z-api.io',
+          },
         });
       } catch (dbError: any) {
         // Se erro for "tabela não existe", retornar erro claro
@@ -165,36 +158,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
           });
         }
         throw dbError; // Re-throw outros erros
-      }
-
-      // Garantir que sempre existe registro antes de atualizar
-      if (!existing) {
-        fastify.log.info({ tenantId }, 'Criando IntegrationConfig automaticamente antes de atualizar');
-        try {
-          existing = await fastify.prisma.integrationConfig.create({
-            data: {
-              tenantId,
-              openaiApiKey: null,
-              n8nWebhookUrl: null,
-              evolutionApiUrl: null,
-              evolutionApiKey: null,
-              evolutionInstance: null,
-              zapiInstanceId: null,
-              zapiToken: null,
-              zapiBaseUrl: 'https://api.z-api.io',
-            },
-          });
-        } catch (createError: any) {
-          if (createError.message?.includes('does not exist') || createError.code === 'P2021') {
-            fastify.log.error({ tenantId, error: createError.message }, 'CRÍTICO: Tabela IntegrationConfig não existe ao criar no PATCH');
-            return reply.status(503).send({
-              error: 'Tabela não encontrada',
-              message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
-              code: 'MIGRATION_PENDING',
-            });
-          }
-          throw createError;
-        }
       }
 
       // Atualizar sempre um registro existente
@@ -341,22 +304,22 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const config = await fastify.prisma.integrationConfig.findUnique({
+      // Usar upsert para garantir que sempre existe um registro
+      const config = await fastify.prisma.integrationConfig.upsert({
         where: { tenantId },
+        update: {}, // Não atualizar nada se já existir
+        create: {
+          tenantId,
+          openaiApiKey: null,
+          n8nWebhookUrl: null,
+          evolutionApiUrl: null,
+          evolutionApiKey: null,
+          evolutionInstance: null,
+          zapiInstanceId: null,
+          zapiToken: null,
+          zapiBaseUrl: 'https://api.z-api.io',
+        },
       });
-
-      if (!config) {
-        return reply.send({
-          success: false,
-          message: 'Nenhuma configuração encontrada',
-          status: {
-            openai: { saved: false, hasValue: false },
-            n8n: { saved: false, hasValue: false },
-            evolution: { saved: false, hasValue: false },
-            zapi: { saved: false, hasValue: false },
-          },
-        });
-      }
 
       return reply.send({
         success: true,

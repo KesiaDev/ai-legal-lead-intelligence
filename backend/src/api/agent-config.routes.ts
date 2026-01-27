@@ -38,35 +38,29 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
         route: request.routerPath,
       }, 'Config endpoint access - GET /api/agent/config');
 
-      // Buscar configuração existente
-      let config = await fastify.prisma.agentConfig.findUnique({
+      // Usar upsert para garantir que sempre existe um registro
+      const config = await fastify.prisma.agentConfig.upsert({
         where: { tenantId },
+        update: {}, // Não atualizar nada se já existir
+        create: {
+          tenantId,
+          name: 'Agente Padrão',
+          description: 'Configuração inicial do agente',
+          isActive: true,
+          communicationConfig: null,
+          followUpConfig: null,
+          scheduleConfig: null,
+          humanizationConfig: null,
+          knowledgeBase: null,
+          intentions: null,
+          templates: null,
+          funnelStages: null,
+          lawyers: null,
+          rotationRules: null,
+          reminders: null,
+          eventConfig: null,
+        },
       });
-
-      // Se não existir, criar automaticamente com valores default
-      if (!config) {
-        fastify.log.info({ tenantId }, 'Criando AgentConfig automaticamente para o tenant');
-        config = await fastify.prisma.agentConfig.create({
-          data: {
-            tenantId,
-            name: 'Agente Padrão',
-            description: 'Configuração inicial do agente',
-            isActive: true,
-            communicationConfig: null,
-            followUpConfig: null,
-            scheduleConfig: null,
-            humanizationConfig: null,
-            knowledgeBase: null,
-            intentions: null,
-            templates: null,
-            funnelStages: null,
-            lawyers: null,
-            rotationRules: null,
-            reminders: null,
-            eventConfig: null,
-          },
-        });
-      }
 
       return reply.send({
         name: config.name,
@@ -142,69 +136,55 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
         eventConfig?: any;
       };
 
-      // Verificar se já existe configuração
-      let existing = null;
-      try {
-        existing = await fastify.prisma.agentConfig.findUnique({
-          where: { tenantId },
-        });
-      } catch (dbError: any) {
-        // Se a tabela não existir, criar a primeira vez
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
-          fastify.log.warn({ tenantId, dbError: dbError.message }, 'Tabela AgentConfig não encontrada ao tentar atualizar/criar. Assumindo que não existe.');
-          existing = null;
-        } else {
-          throw dbError;
-        }
-      }
+      // Garantir que sempre existe registro usando upsert antes de atualizar
+      await fastify.prisma.agentConfig.upsert({
+        where: { tenantId },
+        update: {}, // Não atualizar nada ainda, só garantir que existe
+        create: {
+          tenantId,
+          name: 'Agente Padrão',
+          description: 'Configuração inicial do agente',
+          isActive: true,
+          communicationConfig: null,
+          followUpConfig: null,
+          scheduleConfig: null,
+          humanizationConfig: null,
+          knowledgeBase: null,
+          intentions: null,
+          templates: null,
+          funnelStages: null,
+          lawyers: null,
+          rotationRules: null,
+          reminders: null,
+          eventConfig: null,
+        },
+      });
 
-      let config;
-      if (existing) {
-        // Atualizar existente
-        config = await fastify.prisma.agentConfig.update({
-          where: { tenantId },
-          data: {
-            ...(body.name !== undefined && { name: body.name }),
-            ...(body.description !== undefined && { description: body.description }),
-            ...(body.isActive !== undefined && { isActive: body.isActive }),
-            ...(body.communicationConfig !== undefined && { communicationConfig: body.communicationConfig }),
-            ...(body.followUpConfig !== undefined && { followUpConfig: body.followUpConfig }),
-            ...(body.scheduleConfig !== undefined && { scheduleConfig: body.scheduleConfig }),
-            ...(body.humanizationConfig !== undefined && { humanizationConfig: body.humanizationConfig }),
-            ...(body.knowledgeBase !== undefined && { knowledgeBase: body.knowledgeBase }),
-            ...(body.intentions !== undefined && { intentions: body.intentions }),
-            ...(body.templates !== undefined && { templates: body.templates }),
-            ...(body.funnelStages !== undefined && { funnelStages: body.funnelStages }),
-            ...(body.lawyers !== undefined && { lawyers: body.lawyers }),
-            ...(body.rotationRules !== undefined && { rotationRules: body.rotationRules }),
-            ...(body.reminders !== undefined && { reminders: body.reminders }),
-            ...(body.eventConfig !== undefined && { eventConfig: body.eventConfig }),
-            updatedAt: new Date(),
-          },
-        });
-      } else {
-        // Criar novo
-        config = await fastify.prisma.agentConfig.create({
-          data: {
-            tenantId,
-            name: body.name || 'SDR Jurídico',
-            description: body.description || null,
-            isActive: body.isActive !== undefined ? body.isActive : true,
-            communicationConfig: body.communicationConfig || null,
-            followUpConfig: body.followUpConfig || null,
-            scheduleConfig: body.scheduleConfig || null,
-            humanizationConfig: body.humanizationConfig || null,
-            knowledgeBase: body.knowledgeBase || null,
-            intentions: body.intentions || null,
-            templates: body.templates || null,
-            funnelStages: body.funnelStages || null,
-            lawyers: body.lawyers || null,
-            rotationRules: body.rotationRules || null,
-            reminders: body.reminders || null,
-            eventConfig: body.eventConfig || null,
-          },
-        });
-      }
+      // Atualizar com os dados recebidos
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (body.name !== undefined) updateData.name = body.name;
+      if (body.description !== undefined) updateData.description = body.description;
+      if (body.isActive !== undefined) updateData.isActive = body.isActive;
+      if (body.communicationConfig !== undefined) updateData.communicationConfig = body.communicationConfig;
+      if (body.followUpConfig !== undefined) updateData.followUpConfig = body.followUpConfig;
+      if (body.scheduleConfig !== undefined) updateData.scheduleConfig = body.scheduleConfig;
+      if (body.humanizationConfig !== undefined) updateData.humanizationConfig = body.humanizationConfig;
+      if (body.knowledgeBase !== undefined) updateData.knowledgeBase = body.knowledgeBase;
+      if (body.intentions !== undefined) updateData.intentions = body.intentions;
+      if (body.templates !== undefined) updateData.templates = body.templates;
+      if (body.funnelStages !== undefined) updateData.funnelStages = body.funnelStages;
+      if (body.lawyers !== undefined) updateData.lawyers = body.lawyers;
+      if (body.rotationRules !== undefined) updateData.rotationRules = body.rotationRules;
+      if (body.reminders !== undefined) updateData.reminders = body.reminders;
+      if (body.eventConfig !== undefined) updateData.eventConfig = body.eventConfig;
+
+      const config = await fastify.prisma.agentConfig.update({
+        where: { tenantId },
+        data: updateData,
+      });
 
       fastify.log.info({ tenantId }, 'Configurações do agente atualizadas');
 

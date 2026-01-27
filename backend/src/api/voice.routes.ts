@@ -41,35 +41,29 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         route: request.routerPath,
       }, 'Config endpoint access - GET /api/voice/config');
 
-      // Buscar configuração existente
-      let voiceConfig = await prisma.voiceConfig.findUnique({
+      // Usar upsert para garantir que sempre existe um registro
+      const voiceConfig = await prisma.voiceConfig.upsert({
         where: { tenantId },
+        update: {}, // Não atualizar nada se já existir
+        create: {
+          tenantId,
+          provider: 'elevenlabs',
+          elevenlabsApiKey: null,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL',
+          voiceName: 'Sarah - Profissional Feminina',
+          audioResponseProbabilityOnText: 'nunca',
+          audioResponseProbabilityOnAudio: 'alta',
+          audioResponseProbabilityOnMedia: 'baixa',
+          maxAudioDuration: 60,
+          textToSpeechAdjustment: 'moderado',
+          textOnlyKeywords: [],
+          voiceStability: 0.5,
+          voiceSimilarityBoost: 0.75,
+          voiceStyle: 0.3,
+          voiceSpeed: 1.0,
+          enabled: false,
+        },
       });
-
-      // Se não existir, criar automaticamente com valores default
-      if (!voiceConfig) {
-        fastify.log.info({ tenantId }, 'Criando VoiceConfig automaticamente para o tenant');
-        voiceConfig = await prisma.voiceConfig.create({
-          data: {
-            tenantId,
-            provider: 'elevenlabs',
-            elevenlabsApiKey: null,
-            voiceId: 'EXAVITQu4vr4xnSDxMaL',
-            voiceName: 'Sarah - Profissional Feminina',
-            audioResponseProbabilityOnText: 'nunca',
-            audioResponseProbabilityOnAudio: 'alta',
-            audioResponseProbabilityOnMedia: 'baixa',
-            maxAudioDuration: 60,
-            textToSpeechAdjustment: 'moderado',
-            textOnlyKeywords: [],
-            voiceStability: 0.5,
-            voiceSimilarityBoost: 0.75,
-            voiceStyle: 0.3,
-            voiceSpeed: 1.0,
-            enabled: false,
-          },
-        });
-      }
 
       return reply.status(200).send({
         config: {
@@ -148,80 +142,63 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         enabled?: boolean;
       };
 
-      // Verificar se já existe
-      let existing = null;
-      try {
-        existing = await prisma.voiceConfig.findUnique({
-          where: { tenantId },
-        });
-      } catch (dbError: any) {
-        // Se a tabela não existir, criar a primeira vez
-        if (dbError.message?.includes('does not exist') || dbError.message?.includes('relation') || dbError.code === '42P01' || dbError.code === 'P2025') {
-          fastify.log.warn({ tenantId, error: dbError.message }, 'Tabela VoiceConfig não existe ainda, criando...');
-          existing = null;
-        } else {
-          throw dbError;
-        }
-      }
+      // Garantir que sempre existe registro usando upsert antes de atualizar
+      await prisma.voiceConfig.upsert({
+        where: { tenantId },
+        update: {}, // Não atualizar nada ainda, só garantir que existe
+        create: {
+          tenantId,
+          provider: 'elevenlabs',
+          elevenlabsApiKey: null,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL',
+          voiceName: 'Sarah - Profissional Feminina',
+          audioResponseProbabilityOnText: 'nunca',
+          audioResponseProbabilityOnAudio: 'alta',
+          audioResponseProbabilityOnMedia: 'baixa',
+          maxAudioDuration: 60,
+          textToSpeechAdjustment: 'moderado',
+          textOnlyKeywords: [],
+          voiceStability: 0.5,
+          voiceSimilarityBoost: 0.75,
+          voiceStyle: 0.3,
+          voiceSpeed: 1.0,
+          enabled: false,
+        },
+      });
 
-      if (existing) {
-        // Atualizar
-        const updated = await prisma.voiceConfig.update({
-          where: { tenantId },
-          data: {
-            provider: body.provider || existing.provider,
-            elevenlabsApiKey: body.elevenlabsApiKey !== undefined ? body.elevenlabsApiKey : existing.elevenlabsApiKey,
-            voiceId: body.voiceId || existing.voiceId,
-            voiceName: body.voiceName || existing.voiceName,
-            audioResponseProbabilityOnText: body.audioResponseProbabilityOnText || existing.audioResponseProbabilityOnText,
-            audioResponseProbabilityOnAudio: body.audioResponseProbabilityOnAudio || existing.audioResponseProbabilityOnAudio,
-            audioResponseProbabilityOnMedia: body.audioResponseProbabilityOnMedia || existing.audioResponseProbabilityOnMedia,
-            maxAudioDuration: body.maxAudioDuration !== undefined ? body.maxAudioDuration : existing.maxAudioDuration,
-            textToSpeechAdjustment: body.textToSpeechAdjustment || existing.textToSpeechAdjustment,
-            textOnlyKeywords: body.textOnlyKeywords !== undefined ? body.textOnlyKeywords : existing.textOnlyKeywords,
-            voiceStability: body.voiceStability !== undefined ? body.voiceStability : existing.voiceStability,
-            voiceSimilarityBoost: body.voiceSimilarityBoost !== undefined ? body.voiceSimilarityBoost : existing.voiceSimilarityBoost,
-            voiceStyle: body.voiceStyle !== undefined ? body.voiceStyle : existing.voiceStyle,
-            voiceSpeed: body.voiceSpeed !== undefined ? body.voiceSpeed : existing.voiceSpeed,
-            enabled: body.enabled !== undefined ? body.enabled : existing.enabled,
-            updatedAt: new Date(),
-          },
-        });
+      // Buscar configuração existente para mesclar valores
+      const existing = await prisma.voiceConfig.findUnique({
+        where: { tenantId },
+      });
 
-        fastify.log.info({ tenantId }, 'Configuração de voz atualizada');
-        return reply.status(200).send({
-          success: true,
-          message: 'Configuração de voz atualizada com sucesso',
-        });
-      } else {
-        // Criar nova
-        const created = await prisma.voiceConfig.create({
-          data: {
-            tenantId,
-            provider: body.provider || 'elevenlabs',
-            elevenlabsApiKey: body.elevenlabsApiKey || null,
-            voiceId: body.voiceId || 'EXAVITQu4vr4xnSDxMaL',
-            voiceName: body.voiceName || 'Sarah - Profissional Feminina',
-            audioResponseProbabilityOnText: body.audioResponseProbabilityOnText || 'nunca',
-            audioResponseProbabilityOnAudio: body.audioResponseProbabilityOnAudio || 'alta',
-            audioResponseProbabilityOnMedia: body.audioResponseProbabilityOnMedia || 'baixa',
-            maxAudioDuration: body.maxAudioDuration || 60,
-            textToSpeechAdjustment: body.textToSpeechAdjustment || 'moderado',
-            textOnlyKeywords: body.textOnlyKeywords || [],
-            voiceStability: body.voiceStability || 0.5,
-            voiceSimilarityBoost: body.voiceSimilarityBoost || 0.75,
-            voiceStyle: body.voiceStyle || 0.3,
-            voiceSpeed: body.voiceSpeed || 1.0,
-            enabled: body.enabled || false,
-          },
-        });
+      // Atualizar com os dados recebidos, mantendo valores existentes quando não fornecidos
+      const updated = await prisma.voiceConfig.update({
+        where: { tenantId },
+        data: {
+          provider: body.provider !== undefined ? body.provider : existing!.provider,
+          elevenlabsApiKey: body.elevenlabsApiKey !== undefined ? body.elevenlabsApiKey : existing!.elevenlabsApiKey,
+          voiceId: body.voiceId !== undefined ? body.voiceId : existing!.voiceId,
+          voiceName: body.voiceName !== undefined ? body.voiceName : existing!.voiceName,
+          audioResponseProbabilityOnText: body.audioResponseProbabilityOnText !== undefined ? body.audioResponseProbabilityOnText : existing!.audioResponseProbabilityOnText,
+          audioResponseProbabilityOnAudio: body.audioResponseProbabilityOnAudio !== undefined ? body.audioResponseProbabilityOnAudio : existing!.audioResponseProbabilityOnAudio,
+          audioResponseProbabilityOnMedia: body.audioResponseProbabilityOnMedia !== undefined ? body.audioResponseProbabilityOnMedia : existing!.audioResponseProbabilityOnMedia,
+          maxAudioDuration: body.maxAudioDuration !== undefined ? body.maxAudioDuration : existing!.maxAudioDuration,
+          textToSpeechAdjustment: body.textToSpeechAdjustment !== undefined ? body.textToSpeechAdjustment : existing!.textToSpeechAdjustment,
+          textOnlyKeywords: body.textOnlyKeywords !== undefined ? body.textOnlyKeywords : existing!.textOnlyKeywords,
+          voiceStability: body.voiceStability !== undefined ? body.voiceStability : existing!.voiceStability,
+          voiceSimilarityBoost: body.voiceSimilarityBoost !== undefined ? body.voiceSimilarityBoost : existing!.voiceSimilarityBoost,
+          voiceStyle: body.voiceStyle !== undefined ? body.voiceStyle : existing!.voiceStyle,
+          voiceSpeed: body.voiceSpeed !== undefined ? body.voiceSpeed : existing!.voiceSpeed,
+          enabled: body.enabled !== undefined ? body.enabled : existing!.enabled,
+          updatedAt: new Date(),
+        },
+      });
 
-        fastify.log.info({ tenantId }, 'Configuração de voz criada');
-        return reply.status(201).send({
-          success: true,
-          message: 'Configuração de voz criada com sucesso',
-        });
-      }
+      fastify.log.info({ tenantId }, 'Configuração de voz atualizada');
+      return reply.status(200).send({
+        success: true,
+        message: 'Configuração de voz atualizada com sucesso',
+      });
     } catch (error: any) {
       fastify.log.error({ error }, 'Erro ao salvar configuração de voz');
       return reply.status(500).send({
@@ -273,9 +250,28 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         });
       }
 
-      // Buscar configuração ou usar parâmetros fornecidos
-      const voiceConfig = await prisma.voiceConfig.findUnique({
+      // Usar upsert para garantir que sempre existe um registro
+      const voiceConfig = await prisma.voiceConfig.upsert({
         where: { tenantId },
+        update: {}, // Não atualizar nada se já existir
+        create: {
+          tenantId,
+          provider: 'elevenlabs',
+          elevenlabsApiKey: null,
+          voiceId: 'EXAVITQu4vr4xnSDxMaL',
+          voiceName: 'Sarah - Profissional Feminina',
+          audioResponseProbabilityOnText: 'nunca',
+          audioResponseProbabilityOnAudio: 'alta',
+          audioResponseProbabilityOnMedia: 'baixa',
+          maxAudioDuration: 60,
+          textToSpeechAdjustment: 'moderado',
+          textOnlyKeywords: [],
+          voiceStability: 0.5,
+          voiceSimilarityBoost: 0.75,
+          voiceStyle: 0.3,
+          voiceSpeed: 1.0,
+          enabled: false,
+        },
       });
 
       const testApiKey = apiKey || voiceConfig?.elevenlabsApiKey;
