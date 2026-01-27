@@ -39,28 +39,52 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
       }, 'Config endpoint access - GET /api/agent/config');
 
       // Usar upsert para garantir que sempre existe um registro
-      const config = await fastify.prisma.agentConfig.upsert({
-        where: { tenantId },
-        update: {}, // Não atualizar nada se já existir
-        create: {
+      let config;
+      try {
+        config = await fastify.prisma.agentConfig.upsert({
+          where: { tenantId },
+          update: {}, // Não atualizar nada se já existir
+          create: {
+            tenantId,
+            name: 'Agente Padrão',
+            description: 'Configuração inicial do agente',
+            isActive: true,
+            communicationConfig: null,
+            followUpConfig: null,
+            scheduleConfig: null,
+            humanizationConfig: null,
+            knowledgeBase: null,
+            intentions: null,
+            templates: null,
+            funnelStages: null,
+            lawyers: null,
+            rotationRules: null,
+            reminders: null,
+            eventConfig: null,
+          },
+        });
+      } catch (dbError: any) {
+        // Log detalhado do erro
+        fastify.log.error({ 
           tenantId,
-          name: 'Agente Padrão',
-          description: 'Configuração inicial do agente',
-          isActive: true,
-          communicationConfig: null,
-          followUpConfig: null,
-          scheduleConfig: null,
-          humanizationConfig: null,
-          knowledgeBase: null,
-          intentions: null,
-          templates: null,
-          funnelStages: null,
-          lawyers: null,
-          rotationRules: null,
-          reminders: null,
-          eventConfig: null,
-        },
-      });
+          error: dbError.message,
+          code: dbError.code,
+          meta: dbError.meta,
+          stack: dbError.stack,
+        }, 'Erro ao fazer upsert de AgentConfig');
+        
+        // Se erro for "tabela não existe", retornar erro claro
+        if (dbError.message?.includes('does not exist') || dbError.code === 'P2021') {
+          return reply.status(503).send({
+            error: 'Tabela não encontrada',
+            message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+            code: 'MIGRATION_PENDING',
+          });
+        }
+        
+        // Re-throw para ser capturado pelo catch externo
+        throw dbError;
+      }
 
       return reply.send({
         name: config.name,
@@ -80,10 +104,36 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
         eventConfig: config.eventConfig,
       });
     } catch (error: any) {
-      fastify.log.error({ error }, 'Erro ao buscar configurações do agente');
-      return reply.status(500).send({
+      // Log detalhado do erro
+      fastify.log.error({ 
+        tenantId: request.user?.tenantId,
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        stack: error.stack,
+        errorName: error.name,
+      }, 'Erro ao buscar configurações do agente');
+      
+      // Tratamento específico para erros comuns
+      let errorMessage = error.message || 'Erro desconhecido';
+      let statusCode = 500;
+      
+      // Erro de tabela não existe
+      if (error.message?.includes('does not exist') || error.code === 'P2021') {
+        statusCode = 503;
+        errorMessage = 'Tabela não encontrada. O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.';
+      }
+      
+      // Erro de conexão com banco
+      if (error.code === 'P1001' || error.message?.includes('connect')) {
+        statusCode = 503;
+        errorMessage = 'Erro de conexão com banco de dados. Tente novamente em alguns segundos.';
+      }
+      
+      return reply.status(statusCode).send({
         error: 'Erro ao buscar configurações',
-        message: error.message || 'Erro desconhecido',
+        message: errorMessage,
+        code: error.code || 'UNKNOWN',
       });
     }
   });

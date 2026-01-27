@@ -42,28 +42,52 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
       }, 'Config endpoint access - GET /api/voice/config');
 
       // Usar upsert para garantir que sempre existe um registro
-      const voiceConfig = await prisma.voiceConfig.upsert({
-        where: { tenantId },
-        update: {}, // Não atualizar nada se já existir
-        create: {
+      let voiceConfig;
+      try {
+        voiceConfig = await prisma.voiceConfig.upsert({
+          where: { tenantId },
+          update: {}, // Não atualizar nada se já existir
+          create: {
+            tenantId,
+            provider: 'elevenlabs',
+            elevenlabsApiKey: null,
+            voiceId: 'EXAVITQu4vr4xnSDxMaL',
+            voiceName: 'Sarah - Profissional Feminina',
+            audioResponseProbabilityOnText: 'nunca',
+            audioResponseProbabilityOnAudio: 'alta',
+            audioResponseProbabilityOnMedia: 'baixa',
+            maxAudioDuration: 60,
+            textToSpeechAdjustment: 'moderado',
+            textOnlyKeywords: [],
+            voiceStability: 0.5,
+            voiceSimilarityBoost: 0.75,
+            voiceStyle: 0.3,
+            voiceSpeed: 1.0,
+            enabled: false,
+          },
+        });
+      } catch (dbError: any) {
+        // Log detalhado do erro
+        fastify.log.error({ 
           tenantId,
-          provider: 'elevenlabs',
-          elevenlabsApiKey: null,
-          voiceId: 'EXAVITQu4vr4xnSDxMaL',
-          voiceName: 'Sarah - Profissional Feminina',
-          audioResponseProbabilityOnText: 'nunca',
-          audioResponseProbabilityOnAudio: 'alta',
-          audioResponseProbabilityOnMedia: 'baixa',
-          maxAudioDuration: 60,
-          textToSpeechAdjustment: 'moderado',
-          textOnlyKeywords: [],
-          voiceStability: 0.5,
-          voiceSimilarityBoost: 0.75,
-          voiceStyle: 0.3,
-          voiceSpeed: 1.0,
-          enabled: false,
-        },
-      });
+          error: dbError.message,
+          code: dbError.code,
+          meta: dbError.meta,
+          stack: dbError.stack,
+        }, 'Erro ao fazer upsert de VoiceConfig');
+        
+        // Se erro for "tabela não existe", retornar erro claro
+        if (dbError.message?.includes('does not exist') || dbError.code === 'P2021') {
+          return reply.status(503).send({
+            error: 'Tabela não encontrada',
+            message: 'O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.',
+            code: 'MIGRATION_PENDING',
+          });
+        }
+        
+        // Re-throw para ser capturado pelo catch externo
+        throw dbError;
+      }
 
       return reply.status(200).send({
         config: {
@@ -86,10 +110,36 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         },
       });
     } catch (error: any) {
-      fastify.log.error({ error }, 'Erro ao buscar configuração de voz');
-      return reply.status(500).send({
+      // Log detalhado do erro
+      fastify.log.error({ 
+        tenantId: request.user?.tenantId,
+        error: error.message,
+        code: error.code,
+        meta: error.meta,
+        stack: error.stack,
+        errorName: error.name,
+      }, 'Erro ao buscar configuração de voz');
+      
+      // Tratamento específico para erros comuns
+      let errorMessage = error.message || 'Erro interno';
+      let statusCode = 500;
+      
+      // Erro de tabela não existe
+      if (error.message?.includes('does not exist') || error.code === 'P2021') {
+        statusCode = 503;
+        errorMessage = 'Tabela não encontrada. O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.';
+      }
+      
+      // Erro de conexão com banco
+      if (error.code === 'P1001' || error.message?.includes('connect')) {
+        statusCode = 503;
+        errorMessage = 'Erro de conexão com banco de dados. Tente novamente em alguns segundos.';
+      }
+      
+      return reply.status(statusCode).send({
         error: 'Erro ao buscar configuração de voz',
-        message: error.message || 'Erro interno',
+        message: errorMessage,
+        code: error.code || 'UNKNOWN',
       });
     }
   });
