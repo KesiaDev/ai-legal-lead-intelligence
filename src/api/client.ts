@@ -1,19 +1,28 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
+// URL correta da API - sempre usar esta
+const CORRECT_API_URL = 'https://api.sdrjuridico.com.br';
+
+// Verificar variável de ambiente, mas garantir que nunca use URL antiga
+let envApiUrl = import.meta.env.VITE_API_URL;
+
+// Se a variável de ambiente contém URL antiga, ignorar e usar a correta
+if (envApiUrl && (envApiUrl.includes('sdradvogados.up.railway.app') || envApiUrl.includes('railway.app/api'))) {
+  console.warn('⚠️ VITE_API_URL contém URL antiga, usando URL correta:', envApiUrl);
+  envApiUrl = undefined;
+}
+
+// Usar variável de ambiente se válida, senão usar URL correta
+const API_URL = envApiUrl && !envApiUrl.includes('railway.app') 
+  ? envApiUrl 
+  : CORRECT_API_URL;
 
 // Log para debug - verificar qual URL está sendo usada
 console.log('🔍 API Client Config:', {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
+  VITE_API_URL_ENV: import.meta.env.VITE_API_URL,
   API_URL_USED: API_URL,
-  isCorrect: API_URL.includes('api.sdrjuridico.com.br') || API_URL.includes('sdrjuridico'),
+  isCorrect: API_URL === CORRECT_API_URL,
 });
-
-// Verificar se está usando URL antiga e avisar
-if (API_URL.includes('sdradvogados.up.railway.app')) {
-  console.error('❌ ERRO: Frontend está usando URL antiga!', API_URL);
-  console.error('❌ Configure VITE_API_URL=https://api.sdrjuridico.com.br no Railway');
-}
 
 export const api = axios.create({
   baseURL: API_URL,
