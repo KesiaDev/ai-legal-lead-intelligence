@@ -38,6 +38,48 @@ export function IntegrationsSettings() {
 
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<number | null>(null);
+  const [lastSavedField, setLastSavedField] = useState<string | null>(null);
+
+  // Função helper para auto-save de qualquer campo
+  const handleAutoSave = (fieldName: keyof IntegrationConfig, value: string) => {
+    // Limpar timeout anterior
+    if (autoSaveTimeout) {
+      clearTimeout(autoSaveTimeout);
+    }
+
+    // Salvar temporariamente no localStorage para tokens sensíveis
+    if (fieldName === 'openaiApiKey' && value) {
+      localStorage.setItem('openai_api_key_temp', value);
+    } else if (fieldName === 'evolutionApiKey' && value) {
+      localStorage.setItem('evolution_api_key_temp', value);
+    } else if (fieldName === 'zapiToken' && value) {
+      localStorage.setItem('zapi_token_temp', value);
+    }
+
+    // Auto-save após 2 segundos de inatividade
+    const timeout = window.setTimeout(async () => {
+      if (value && value.trim().length > 0) {
+        try {
+          const payload: any = {};
+          payload[fieldName] = value.trim();
+
+          await api.patch('/api/integrations', payload);
+          
+          setLastSavedField(fieldName);
+          toast({
+            title: 'Salvo automaticamente!',
+            description: `O campo ${fieldName} foi salvo automaticamente.`,
+            variant: 'default',
+          });
+        } catch (err: any) {
+          // Silenciosamente falha - usuário pode salvar manualmente depois
+          console.log(`Auto-save falhou para ${fieldName}:`, err.message);
+        }
+      }
+    }, 2000);
+
+    setAutoSaveTimeout(timeout);
+  };
 
   useEffect(() => {
     // Só carregar se o usuário estiver autenticado
@@ -120,37 +162,65 @@ export function IntegrationsSettings() {
       // IMPORTANTE: Enviar openaiApiKey mesmo se for string vazia, para permitir limpar
       const payload: any = {};
       
-      // Sempre enviar openaiApiKey se estiver definido (mesmo que vazio)
+      // Sempre enviar todos os campos que foram modificados
+      // IMPORTANTE: Enviar null para strings vazias para limpar, não undefined
       if (formData.openaiApiKey !== undefined) {
-        payload.openaiApiKey = formData.openaiApiKey || null; // Enviar null se vazio para limpar
+        payload.openaiApiKey = formData.openaiApiKey && formData.openaiApiKey.trim() !== '' ? formData.openaiApiKey : null;
       }
       
       if (formData.n8nWebhookUrl !== undefined) {
-        payload.n8nWebhookUrl = formData.n8nWebhookUrl || undefined;
+        payload.n8nWebhookUrl = formData.n8nWebhookUrl && formData.n8nWebhookUrl.trim() !== '' ? formData.n8nWebhookUrl : null;
       }
       if (formData.evolutionApiUrl !== undefined) {
-        payload.evolutionApiUrl = formData.evolutionApiUrl || undefined;
+        payload.evolutionApiUrl = formData.evolutionApiUrl && formData.evolutionApiUrl.trim() !== '' ? formData.evolutionApiUrl : null;
       }
       if (formData.evolutionApiKey !== undefined) {
-        payload.evolutionApiKey = formData.evolutionApiKey || undefined;
+        payload.evolutionApiKey = formData.evolutionApiKey && formData.evolutionApiKey.trim() !== '' ? formData.evolutionApiKey : null;
       }
       if (formData.evolutionInstance !== undefined) {
-        payload.evolutionInstance = formData.evolutionInstance || undefined;
+        payload.evolutionInstance = formData.evolutionInstance && formData.evolutionInstance.trim() !== '' ? formData.evolutionInstance : null;
       }
       if (formData.zapiInstanceId !== undefined) {
-        payload.zapiInstanceId = formData.zapiInstanceId || undefined;
+        payload.zapiInstanceId = formData.zapiInstanceId && formData.zapiInstanceId.trim() !== '' ? formData.zapiInstanceId : null;
       }
       if (formData.zapiToken !== undefined) {
-        payload.zapiToken = formData.zapiToken || undefined;
+        payload.zapiToken = formData.zapiToken && formData.zapiToken.trim() !== '' ? formData.zapiToken : null;
       }
       if (formData.zapiBaseUrl !== undefined) {
-        payload.zapiBaseUrl = formData.zapiBaseUrl || undefined;
+        payload.zapiBaseUrl = formData.zapiBaseUrl && formData.zapiBaseUrl.trim() !== '' ? formData.zapiBaseUrl : null;
       }
+      
+      console.log('Enviando payload para salvar integrações:', {
+        ...payload,
+        // Não logar valores completos de tokens por segurança
+        openaiApiKey: payload.openaiApiKey ? `***${payload.openaiApiKey.slice(-4)}` : null,
+        evolutionApiKey: payload.evolutionApiKey ? `***${payload.evolutionApiKey.slice(-4)}` : null,
+        zapiToken: payload.zapiToken ? `***${payload.zapiToken.slice(-4)}` : null,
+      });
       
       const response = await api.patch('/api/integrations', payload);
 
-      // Também salvar no localStorage para referência
-      localStorage.setItem('integration_config', JSON.stringify(formData));
+      console.log('Resposta do servidor:', response.data);
+
+      // Também salvar no localStorage para referência (sem tokens completos por segurança)
+      const safeFormData = {
+        ...formData,
+        openaiApiKey: formData.openaiApiKey ? '***' : '',
+        evolutionApiKey: formData.evolutionApiKey ? '***' : '',
+        zapiToken: formData.zapiToken ? '***' : '',
+      };
+      localStorage.setItem('integration_config', JSON.stringify(safeFormData));
+
+      // Salvar tokens temporariamente no localStorage para não perder ao recarregar
+      if (formData.openaiApiKey) {
+        localStorage.setItem('openai_api_key_temp', formData.openaiApiKey);
+      }
+      if (formData.evolutionApiKey) {
+        localStorage.setItem('evolution_api_key_temp', formData.evolutionApiKey);
+      }
+      if (formData.zapiToken) {
+        localStorage.setItem('zapi_token_temp', formData.zapiToken);
+      }
 
       toast({
         title: 'Configurações salvas!',
@@ -352,40 +422,7 @@ export function IntegrationsSettings() {
                     onChange={(e) => {
                       const newValue = e.target.value;
                       setFormData({ ...formData, openaiApiKey: newValue });
-                      
-                      // Salvar temporariamente no localStorage para não perder ao recarregar
-                      if (newValue) {
-                        localStorage.setItem('openai_api_key_temp', newValue);
-                      } else {
-                        localStorage.removeItem('openai_api_key_temp');
-                      }
-                      
-                      // Auto-save após 2 segundos sem digitar
-                      setAutoSaveTimeout((prevTimeout) => {
-                        if (prevTimeout) {
-                          clearTimeout(prevTimeout);
-                        }
-                        
-                        const timeout = window.setTimeout(async () => {
-                          if (newValue && newValue.length > 10) {
-                            try {
-                              await api.patch('/api/integrations', {
-                                openaiApiKey: newValue,
-                              });
-                              toast({
-                                title: 'Salvo automaticamente!',
-                                description: 'A chave da OpenAI foi salva automaticamente.',
-                                variant: 'default',
-                              });
-                            } catch (err: any) {
-                              // Silenciosamente falha - usuário pode salvar manualmente depois
-                              console.log('Auto-save falhou (pode ser migration pendente):', err.message);
-                            }
-                          }
-                        }, 2000);
-                        
-                        return timeout;
-                      });
+                      handleAutoSave('openaiApiKey', newValue);
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
@@ -467,7 +504,11 @@ export function IntegrationsSettings() {
                     type="url"
                     placeholder="https://seu-n8n.com/webhook/..."
                     value={formData.n8nWebhookUrl || ''}
-                    onChange={(e) => setFormData({ ...formData, n8nWebhookUrl: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, n8nWebhookUrl: newValue });
+                      handleAutoSave('n8nWebhookUrl', newValue);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     URL do webhook do seu workflow N8N que receberá os leads.
@@ -545,7 +586,11 @@ export function IntegrationsSettings() {
                     type="url"
                     placeholder="https://seu-evolution.com"
                     value={formData.evolutionApiUrl || ''}
-                    onChange={(e) => setFormData({ ...formData, evolutionApiUrl: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, evolutionApiUrl: newValue });
+                      handleAutoSave('evolutionApiUrl', newValue);
+                    }}
                   />
                 </div>
 
@@ -556,7 +601,11 @@ export function IntegrationsSettings() {
                     type="password"
                     placeholder="Sua API key da Evolution"
                     value={formData.evolutionApiKey || ''}
-                    onChange={(e) => setFormData({ ...formData, evolutionApiKey: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, evolutionApiKey: newValue });
+                      handleAutoSave('evolutionApiKey', newValue);
+                    }}
                   />
                 </div>
 
@@ -566,7 +615,11 @@ export function IntegrationsSettings() {
                     id="evolution-instance"
                     placeholder="SDRAdvogados2"
                     value={formData.evolutionInstance || ''}
-                    onChange={(e) => setFormData({ ...formData, evolutionInstance: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, evolutionInstance: newValue });
+                      handleAutoSave('evolutionInstance', newValue);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     Nome da instância criada no Evolution API Manager.
@@ -644,7 +697,11 @@ export function IntegrationsSettings() {
                     id="zapi-instance-id"
                     placeholder="3EDAA0991A2272AFA1183EBEF7B316F4"
                     value={formData.zapiInstanceId || ''}
-                    onChange={(e) => setFormData({ ...formData, zapiInstanceId: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, zapiInstanceId: newValue });
+                      handleAutoSave('zapiInstanceId', newValue);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     ID da instância do Z-API (encontre em: Dados da instância web).
@@ -658,7 +715,11 @@ export function IntegrationsSettings() {
                     type="password"
                     placeholder="147E1F8CFCAACFFE1799DFAE"
                     value={formData.zapiToken || ''}
-                    onChange={(e) => setFormData({ ...formData, zapiToken: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, zapiToken: newValue });
+                      handleAutoSave('zapiToken', newValue);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     Token da instância do Z-API (encontre em: Dados da instância web).
@@ -672,7 +733,11 @@ export function IntegrationsSettings() {
                     type="url"
                     placeholder="https://api.z-api.io"
                     value={formData.zapiBaseUrl || 'https://api.z-api.io'}
-                    onChange={(e) => setFormData({ ...formData, zapiBaseUrl: e.target.value })}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setFormData({ ...formData, zapiBaseUrl: newValue });
+                      handleAutoSave('zapiBaseUrl', newValue);
+                    }}
                   />
                   <p className="text-xs text-muted-foreground">
                     URL base da API Z-API (padrão: https://api.z-api.io).

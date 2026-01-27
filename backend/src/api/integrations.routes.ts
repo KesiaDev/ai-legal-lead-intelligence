@@ -150,29 +150,47 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         updatedAt: new Date(),
       };
       
+      // Log detalhado do que está sendo recebido
+      fastify.log.info({ 
+        tenantId,
+        receivedFields: Object.keys(body),
+        hasOpenaiKey: !!body.openaiApiKey,
+        hasEvolutionKey: !!body.evolutionApiKey,
+        hasZapiToken: !!body.zapiToken,
+        hasN8nUrl: !!body.n8nWebhookUrl,
+      }, 'Recebendo dados para atualizar integrações');
+      
       if (body.openaiApiKey !== undefined) {
         updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
+        fastify.log.info({ tenantId, hasValue: !!updateData.openaiApiKey, length: updateData.openaiApiKey?.length || 0 }, 'OpenAI API Key será atualizada');
       }
       if (body.n8nWebhookUrl !== undefined) {
-        updateData.n8nWebhookUrl = body.n8nWebhookUrl || null;
+        updateData.n8nWebhookUrl = body.n8nWebhookUrl === null || body.n8nWebhookUrl === '' ? null : body.n8nWebhookUrl;
+        fastify.log.info({ tenantId, hasValue: !!updateData.n8nWebhookUrl }, 'N8N Webhook URL será atualizada');
       }
       if (body.evolutionApiUrl !== undefined) {
-        updateData.evolutionApiUrl = body.evolutionApiUrl || null;
+        updateData.evolutionApiUrl = body.evolutionApiUrl === null || body.evolutionApiUrl === '' ? null : body.evolutionApiUrl;
+        fastify.log.info({ tenantId, hasValue: !!updateData.evolutionApiUrl }, 'Evolution API URL será atualizada');
       }
       if (body.evolutionApiKey !== undefined) {
-        updateData.evolutionApiKey = body.evolutionApiKey || null;
+        updateData.evolutionApiKey = body.evolutionApiKey === null || body.evolutionApiKey === '' ? null : body.evolutionApiKey;
+        fastify.log.info({ tenantId, hasValue: !!updateData.evolutionApiKey, length: updateData.evolutionApiKey?.length || 0 }, 'Evolution API Key será atualizada');
       }
       if (body.evolutionInstance !== undefined) {
-        updateData.evolutionInstance = body.evolutionInstance || null;
+        updateData.evolutionInstance = body.evolutionInstance === null || body.evolutionInstance === '' ? null : body.evolutionInstance;
+        fastify.log.info({ tenantId, hasValue: !!updateData.evolutionInstance }, 'Evolution Instance será atualizada');
       }
       if (body.zapiInstanceId !== undefined) {
-        updateData.zapiInstanceId = body.zapiInstanceId || null;
+        updateData.zapiInstanceId = body.zapiInstanceId === null || body.zapiInstanceId === '' ? null : body.zapiInstanceId;
+        fastify.log.info({ tenantId, hasValue: !!updateData.zapiInstanceId }, 'Z-API Instance ID será atualizada');
       }
       if (body.zapiToken !== undefined) {
-        updateData.zapiToken = body.zapiToken || null;
+        updateData.zapiToken = body.zapiToken === null || body.zapiToken === '' ? null : body.zapiToken;
+        fastify.log.info({ tenantId, hasValue: !!updateData.zapiToken, length: updateData.zapiToken?.length || 0 }, 'Z-API Token será atualizada');
       }
       if (body.zapiBaseUrl !== undefined) {
-        updateData.zapiBaseUrl = body.zapiBaseUrl || null;
+        updateData.zapiBaseUrl = body.zapiBaseUrl === null || body.zapiBaseUrl === '' ? null : body.zapiBaseUrl;
+        fastify.log.info({ tenantId, hasValue: !!updateData.zapiBaseUrl }, 'Z-API Base URL será atualizada');
       }
       
       const config = await fastify.prisma.integrationConfig.update({
@@ -180,7 +198,18 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         data: updateData,
       });
 
-      fastify.log.info({ tenantId }, 'Configurações de integração atualizadas');
+      // Log detalhado do que foi salvo (sem mostrar valores completos por segurança)
+      fastify.log.info({ 
+        tenantId,
+        savedFields: Object.keys(updateData).filter(k => k !== 'updatedAt'),
+        hasOpenaiKey: !!config.openaiApiKey,
+        hasEvolutionKey: !!config.evolutionApiKey,
+        hasZapiToken: !!config.zapiToken,
+        hasN8nUrl: !!config.n8nWebhookUrl,
+        hasEvolutionUrl: !!config.evolutionApiUrl,
+        hasEvolutionInstance: !!config.evolutionInstance,
+        hasZapiInstanceId: !!config.zapiInstanceId,
+      }, 'Configurações de integração atualizadas com sucesso');
 
       return reply.send({
         success: true,
@@ -208,6 +237,82 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       
       return reply.status(500).send({
         error: 'Erro ao salvar configurações',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
+  /**
+   * Endpoint de verificação - retorna status dos tokens salvos (sem valores completos)
+   */
+  fastify.get('/api/integrations/verify', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId = request.user?.tenantId;
+
+      if (!tenantId) {
+        return reply.status(401).send({
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
+        });
+      }
+
+      const config = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
+
+      if (!config) {
+        return reply.send({
+          success: false,
+          message: 'Nenhuma configuração encontrada',
+          status: {
+            openai: { saved: false, hasValue: false },
+            n8n: { saved: false, hasValue: false },
+            evolution: { saved: false, hasValue: false },
+            zapi: { saved: false, hasValue: false },
+          },
+        });
+      }
+
+      return reply.send({
+        success: true,
+        message: 'Configurações encontradas',
+        status: {
+          openai: { 
+            saved: true, 
+            hasValue: !!config.openaiApiKey,
+            preview: config.openaiApiKey ? `***${config.openaiApiKey.slice(-4)}` : null,
+          },
+          n8n: { 
+            saved: true, 
+            hasValue: !!config.n8nWebhookUrl,
+            preview: config.n8nWebhookUrl || null,
+          },
+          evolution: { 
+            saved: true, 
+            hasValue: !!(config.evolutionApiKey && config.evolutionApiUrl && config.evolutionInstance),
+            preview: {
+              url: config.evolutionApiUrl || null,
+              instance: config.evolutionInstance || null,
+              key: config.evolutionApiKey ? `***${config.evolutionApiKey.slice(-4)}` : null,
+            },
+          },
+          zapi: { 
+            saved: true, 
+            hasValue: !!(config.zapiInstanceId && config.zapiToken),
+            preview: {
+              instanceId: config.zapiInstanceId || null,
+              token: config.zapiToken ? `***${config.zapiToken.slice(-4)}` : null,
+              baseUrl: config.zapiBaseUrl || null,
+            },
+          },
+        },
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao verificar configurações de integração');
+      return reply.status(500).send({
+        error: 'Erro ao verificar configurações',
         message: error.message || 'Erro desconhecido',
       });
     }
