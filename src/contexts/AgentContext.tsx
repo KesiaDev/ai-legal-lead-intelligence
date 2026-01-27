@@ -10,6 +10,7 @@ import {
   BusinessHours,
 } from '@/types/agent';
 import { promptsApi } from '@/api/prompts';
+import { api } from '@/api/client';
 import { useAuth } from './AuthContext';
 import { HumanizationConfig, DEFAULT_HUMANIZATION_CONFIG } from '@/types/humanization';
 import { VoiceConfig, DEFAULT_VOICE_CONFIG } from '@/types/voice';
@@ -444,24 +445,14 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const loadVoiceConfigFromBackend = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
+      const response = await api.get('/api/voice/config');
       
-      const response = await fetch(`${API_URL}/api/voice/config`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.config) {
-          setVoiceConfig({
-            ...DEFAULT_VOICE_CONFIG,
-            ...data.config,
-            elevenlabsApiKey: data.config.elevenlabsApiKey || (voiceConfig as any).elevenlabsApiKey,
-          } as VoiceConfig);
-        }
+      if (response.data.config) {
+        setVoiceConfig({
+          ...DEFAULT_VOICE_CONFIG,
+          ...response.data.config,
+          elevenlabsApiKey: response.data.config.elevenlabsApiKey || (voiceConfig as any).elevenlabsApiKey,
+        } as VoiceConfig);
       }
     } catch (error) {
       console.error('Erro ao carregar configuração de voz:', error);
@@ -470,17 +461,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
 
   const loadAgentConfigFromBackend = async () => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
+      const response = await api.get('/api/agent/config');
       
-      const response = await fetch(`${API_URL}/api/agent/config`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
+      if (response.data) {
+        const data = response.data;
         
         // Atualizar configurações básicas do agente
         if (data.name || data.description !== undefined || data.isActive !== undefined) {
@@ -570,20 +554,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: newAgent.name,
-          description: newAgent.description,
-          isActive: newAgent.isActive,
-        }),
+      await api.patch('/api/agent/config', {
+        name: newAgent.name,
+        description: newAgent.description,
+        isActive: newAgent.isActive,
       });
     } catch (error) {
       console.error('Erro ao salvar configurações do agente:', error);
@@ -596,18 +570,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          communicationConfig: newCommunication,
-        }),
+      await api.patch('/api/agent/config', {
+        communicationConfig: newCommunication,
       });
     } catch (error) {
       console.error('Erro ao salvar configurações de comunicação:', error);
@@ -674,16 +638,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setKnowledgeBase(newBase);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ knowledgeBase: newBase }),
+      await api.patch('/api/agent/config', {
+        knowledgeBase: newBase,
       });
     } catch (error) {
       console.error('Erro ao salvar base de conhecimento:', error);
@@ -695,16 +651,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setKnowledgeBase(newBase);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ knowledgeBase: newBase }),
+      await api.patch('/api/agent/config', {
+        knowledgeBase: newBase,
       });
     } catch (error) {
       console.error('Erro ao salvar base de conhecimento:', error);
@@ -716,16 +664,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setKnowledgeBase(newBase);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ knowledgeBase: newBase }),
+      await api.patch('/api/agent/config', {
+        knowledgeBase: newBase,
       });
     } catch (error) {
       console.error('Erro ao salvar base de conhecimento:', error);
@@ -738,18 +678,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          followUpConfig: newConfig,
-        }),
+      await api.patch('/api/agent/config', {
+        followUpConfig: newConfig,
       });
     } catch (error) {
       console.error('Erro ao salvar configurações de follow-up:', error);
@@ -762,18 +692,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          scheduleConfig: newConfig,
-        }),
+      await api.patch('/api/agent/config', {
+        scheduleConfig: newConfig,
       });
     } catch (error) {
       console.error('Erro ao salvar configurações de agendamento:', error);
@@ -786,18 +706,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          intentions: newIntentions,
-        }),
+      await api.patch('/api/agent/config', {
+        intentions: newIntentions,
       });
     } catch (error) {
       console.error('Erro ao salvar intenções:', error);
@@ -810,18 +720,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          intentions: newIntentions,
-        }),
+      await api.patch('/api/agent/config', {
+        intentions: newIntentions,
       });
     } catch (error) {
       console.error('Erro ao salvar intenções:', error);
@@ -834,18 +734,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          intentions: newIntentions,
-        }),
+      await api.patch('/api/agent/config', {
+        intentions: newIntentions,
       });
     } catch (error) {
       console.error('Erro ao salvar intenções:', error);
@@ -858,18 +748,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          humanizationConfig: newConfig,
-        }),
+      await api.patch('/api/agent/config', {
+        humanizationConfig: newConfig,
       });
     } catch (error) {
       console.error('Erro ao salvar configurações de humanização:', error);
@@ -882,24 +762,10 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     
     // Salvar no backend
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_URL}/api/voice/config`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...newConfig,
-          elevenlabsApiKey: (newConfig as any).elevenlabsApiKey,
-        }),
+      await api.post('/api/voice/config', {
+        ...newConfig,
+        elevenlabsApiKey: (newConfig as any).elevenlabsApiKey,
       });
-      
-      if (!response.ok) {
-        console.error('Erro ao salvar configuração de voz:', await response.text());
-      }
     } catch (error) {
       console.error('Erro ao salvar configuração de voz:', error);
     }
@@ -911,16 +777,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setTemplates(newTemplates);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ templates: newTemplates }),
+      await api.patch('/api/agent/config', {
+        templates: newTemplates,
       });
     } catch (error) {
       console.error('Erro ao salvar templates:', error);
@@ -932,16 +790,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setTemplates(newTemplates);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ templates: newTemplates }),
+      await api.patch('/api/agent/config', {
+        templates: newTemplates,
       });
     } catch (error) {
       console.error('Erro ao salvar templates:', error);
@@ -953,16 +803,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setTemplates(newTemplates);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ templates: newTemplates }),
+      await api.patch('/api/agent/config', {
+        templates: newTemplates,
       });
     } catch (error) {
       console.error('Erro ao salvar templates:', error);
@@ -975,16 +817,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setFunnelStages(newStages);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ funnelStages: newStages }),
+      await api.patch('/api/agent/config', {
+        funnelStages: newStages,
       });
     } catch (error) {
       console.error('Erro ao salvar funnel stages:', error);
@@ -996,16 +830,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setFunnelStages(newStages);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ funnelStages: newStages }),
+      await api.patch('/api/agent/config', {
+        funnelStages: newStages,
       });
     } catch (error) {
       console.error('Erro ao salvar funnel stages:', error);
@@ -1017,16 +843,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setFunnelStages(newStages);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ funnelStages: newStages }),
+      await api.patch('/api/agent/config', {
+        funnelStages: newStages,
       });
     } catch (error) {
       console.error('Erro ao salvar funnel stages:', error);
@@ -1039,16 +857,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setLawyers(newLawyers);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ lawyers: newLawyers }),
+      await api.patch('/api/agent/config', {
+        lawyers: newLawyers,
       });
     } catch (error) {
       console.error('Erro ao salvar lawyers:', error);
@@ -1060,16 +870,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setLawyers(newLawyers);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ lawyers: newLawyers }),
+      await api.patch('/api/agent/config', {
+        lawyers: newLawyers,
       });
     } catch (error) {
       console.error('Erro ao salvar lawyers:', error);
@@ -1081,16 +883,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setLawyers(newLawyers);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ lawyers: newLawyers }),
+      await api.patch('/api/agent/config', {
+        lawyers: newLawyers,
       });
     } catch (error) {
       console.error('Erro ao salvar lawyers:', error);
@@ -1103,16 +897,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setRotationRules(newRules);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ rotationRules: newRules }),
+      await api.patch('/api/agent/config', {
+        rotationRules: newRules,
       });
     } catch (error) {
       console.error('Erro ao salvar rotation rules:', error);
@@ -1125,16 +911,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setReminders(newReminders);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reminders: newReminders }),
+      await api.patch('/api/agent/config', {
+        reminders: newReminders,
       });
     } catch (error) {
       console.error('Erro ao salvar reminders:', error);
@@ -1146,16 +924,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setReminders(newReminders);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reminders: newReminders }),
+      await api.patch('/api/agent/config', {
+        reminders: newReminders,
       });
     } catch (error) {
       console.error('Erro ao salvar reminders:', error);
@@ -1167,16 +937,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setReminders(newReminders);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ reminders: newReminders }),
+      await api.patch('/api/agent/config', {
+        reminders: newReminders,
       });
     } catch (error) {
       console.error('Erro ao salvar reminders:', error);
@@ -1189,16 +951,8 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     setEventConfig(newConfig);
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'https://api.sdrjuridico.com.br';
-      const token = localStorage.getItem('auth_token');
-      
-      await fetch(`${API_URL}/api/agent/config`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ eventConfig: newConfig }),
+      await api.patch('/api/agent/config', {
+        eventConfig: newConfig,
       });
     } catch (error) {
       console.error('Erro ao salvar event config:', error);

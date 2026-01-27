@@ -236,9 +236,11 @@ export function IntegrationsSettings() {
       if (err.response) {
         // Erro do servidor
         if (err.response.status === 500) {
-          errorMessage = 'Erro no servidor. A migration pode não ter sido aplicada ainda. Aguarde alguns minutos e tente novamente.';
+          errorMessage = 'Erro interno do servidor. Tente novamente em alguns instantes. Se o problema persistir, entre em contato com o suporte.';
         } else if (err.response.status === 401) {
           errorMessage = 'Não autenticado. Faça logout e login novamente.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'Você não tem permissão para realizar esta ação.';
         } else {
           errorMessage = err.response?.data?.message || 
                         err.response?.data?.error || 
