@@ -15,6 +15,16 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate],
   }, async (request: any, reply: any) => {
     try {
+      // DEBUG: Log detalhado do request.user
+      request.log.info({
+        hasUser: !!request.user,
+        userId: request.user?.id,
+        tenantId: request.user?.tenantId,
+        userObject: request.user,
+        route: request.routerPath,
+        authHeader: request.headers.authorization ? 'present' : 'missing',
+      }, 'DEBUG: Request user info - GET /api/integrations');
+
       // Validação obrigatória de tenantId ANTES de qualquer chamada Prisma
       const tenantId = request.user?.tenantId;
 
@@ -96,6 +106,16 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
     preHandler: [authenticate],
   }, async (request: any, reply: any) => {
     try {
+      // DEBUG: Log detalhado do request.user
+      request.log.info({
+        hasUser: !!request.user,
+        userId: request.user?.id,
+        tenantId: request.user?.tenantId,
+        userObject: request.user,
+        route: request.routerPath,
+        authHeader: request.headers.authorization ? 'present' : 'missing',
+      }, 'DEBUG: Request user info - PATCH /api/integrations');
+
       // Validação obrigatória de tenantId ANTES de qualquer chamada Prisma
       const tenantId = request.user?.tenantId;
 
