@@ -315,7 +315,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         hasOpenaiKey: !!config.openaiApiKey,
         hasEvolutionKey: !!config.evolutionApiKey,
         hasZapiToken: !!config.zapiToken,
-        hasN8nUrl: !!config.n8nWebhookUrl,
         hasEvolutionUrl: !!config.evolutionApiUrl,
         hasEvolutionInstance: !!config.evolutionInstance,
         hasZapiInstanceId: !!config.zapiInstanceId,
@@ -423,11 +422,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
             saved: true, 
             hasValue: !!config.openaiApiKey,
             preview: config.openaiApiKey ? `***${config.openaiApiKey.slice(-4)}` : null,
-          },
-          n8n: { 
-            saved: true, 
-            hasValue: !!config.n8nWebhookUrl,
-            preview: config.n8nWebhookUrl || null,
           },
           evolution: { 
             saved: true, 
