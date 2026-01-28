@@ -19,19 +19,20 @@ export async function registerWhatsAppRoutes(fastify: FastifyInstance) {
     try {
       fastify.log.info({ body: request.body }, 'Webhook WhatsApp recebido');
 
-      // Validar se Evolution API está configurada
-      if (!whatsappService.isConfigured()) {
-        fastify.log.warn('Evolution API não configurada. Webhook ignorado.');
+      const webhookData = request.body as WhatsAppWebhookData;
+
+      // Extrair clienteId do header ou body (se fornecido)
+      const clienteId = request.headers['x-cliente-id'] || request.body?.clienteId;
+
+      // Validar se Evolution API está configurada (pode ser por tenant ou global)
+      const isConfigured = await whatsappService.isConfigured(clienteId);
+      if (!isConfigured) {
+        fastify.log.warn({ clienteId }, 'Evolution API não configurada. Webhook ignorado.');
         return reply.status(200).send({
           success: false,
           message: 'Evolution API não configurada',
         });
       }
-
-      const webhookData = request.body as WhatsAppWebhookData;
-
-      // Extrair clienteId do header ou body (se fornecido)
-      const clienteId = request.headers['x-cliente-id'] || request.body?.clienteId;
 
       // Processar webhook
       await whatsappService.handleWebhook(webhookData, clienteId);
@@ -54,7 +55,11 @@ export async function registerWhatsAppRoutes(fastify: FastifyInstance) {
    */
   fastify.post('/api/whatsapp/send', async (request: any, reply: any) => {
     try {
-      const { to, message } = request.body as { to: string; message: string };
+      const { to, message, tenantId } = request.body as { 
+        to: string; 
+        message: string;
+        tenantId?: string;
+      };
 
       if (!to || !message) {
         return reply.status(400).send({
@@ -63,14 +68,16 @@ export async function registerWhatsAppRoutes(fastify: FastifyInstance) {
         });
       }
 
-      if (!whatsappService.isConfigured()) {
+      // Validar se Evolution API está configurada (pode ser por tenant ou global)
+      const isConfigured = await whatsappService.isConfigured(tenantId);
+      if (!isConfigured) {
         return reply.status(400).send({
           error: 'Evolution API not configured',
-          message: 'Configure EVOLUTION_API_URL, EVOLUTION_API_KEY, and EVOLUTION_INSTANCE',
+          message: 'Configure Evolution API via IntegrationConfig (tenant) or environment variables (global)',
         });
       }
 
-      await whatsappService.sendMessage(to, message);
+      await whatsappService.sendMessage(to, message, tenantId);
 
       return reply.status(200).send({
         success: true,
@@ -89,11 +96,16 @@ export async function registerWhatsAppRoutes(fastify: FastifyInstance) {
    * Health check do serviço WhatsApp
    */
   fastify.get('/api/whatsapp/health', async (request: any, reply: any) => {
+    const tenantId = request.query?.tenantId as string | undefined;
+    const configured = await whatsappService.isConfigured(tenantId);
+    
     return reply.status(200).send({
-      configured: whatsappService.isConfigured(),
-      evolutionApiUrl: process.env.EVOLUTION_API_URL ? 'configured' : 'not configured',
-      evolutionApiKey: process.env.EVOLUTION_API_KEY ? 'configured' : 'not configured',
-      evolutionInstance: process.env.EVOLUTION_INSTANCE ? 'configured' : 'not configured',
+      configured,
+      tenantId: tenantId || 'global',
+      evolutionApiUrl: process.env.EVOLUTION_API_URL ? 'configured (env)' : 'not configured',
+      evolutionApiKey: process.env.EVOLUTION_API_KEY ? 'configured (env)' : 'not configured',
+      evolutionInstance: process.env.EVOLUTION_INSTANCE ? 'configured (env)' : 'not configured',
+      note: 'Configurations can come from IntegrationConfig (database) or environment variables',
     });
   });
 }

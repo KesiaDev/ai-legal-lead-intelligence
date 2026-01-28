@@ -416,14 +416,15 @@ async function build() {
           telefone: normalizedPhone,
           email: normalizedEmail || undefined,
           origem: origem || undefined,
-        });
+          tenantId, // Passar tenantId para buscar configuração do banco
+        }, fastify); // Passar fastify para acesso ao IntegrationConfigService
         fastify.log.info(
-          { classification, normalizedName, normalizedPhone },
+          { classification, normalizedName, normalizedPhone, tenantId },
           'Lead classified'
         );
       } catch (classificationError: unknown) {
         fastify.log.warn(
-          { error: classificationError },
+          { error: classificationError, tenantId },
           'Classification failed, continuing without classification'
         );
         // Continua sem classificação (não quebra o endpoint)

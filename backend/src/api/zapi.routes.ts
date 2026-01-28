@@ -19,19 +19,20 @@ export async function registerZApiRoutes(fastify: FastifyInstance) {
     try {
       fastify.log.info({ body: request.body }, 'Webhook Z-API recebido');
 
-      // Validar se Z-API está configurada
-      if (!zapiService.isConfigured()) {
-        fastify.log.warn('Z-API não configurada. Webhook ignorado.');
+      const webhookData = request.body as ZApiWebhookData;
+
+      // Extrair clienteId do header ou body (se fornecido)
+      const clienteId = request.headers['x-cliente-id'] || request.body?.clienteId;
+
+      // Validar se Z-API está configurada (pode ser por tenant ou global)
+      const isConfigured = await zapiService.isConfigured(clienteId);
+      if (!isConfigured) {
+        fastify.log.warn({ clienteId }, 'Z-API não configurada. Webhook ignorado.');
         return reply.status(200).send({
           success: false,
           message: 'Z-API não configurada',
         });
       }
-
-      const webhookData = request.body as ZApiWebhookData;
-
-      // Extrair clienteId do header ou body (se fornecido)
-      const clienteId = request.headers['x-cliente-id'] || request.body?.clienteId;
 
       // Processar webhook
       await zapiService.handleWebhook(webhookData, clienteId);
@@ -67,10 +68,12 @@ export async function registerZApiRoutes(fastify: FastifyInstance) {
         });
       }
 
-      if (!zapiService.isConfigured()) {
+      // Validar se Z-API está configurada (pode ser por tenant ou global)
+      const isConfigured = await zapiService.isConfigured(tenantId);
+      if (!isConfigured) {
         return reply.status(400).send({
           error: 'Z-API not configured',
-          message: 'Configure ZAPI_INSTANCE_ID and ZAPI_TOKEN',
+          message: 'Configure Z-API via IntegrationConfig (tenant) or environment variables (global)',
         });
       }
 
@@ -93,11 +96,16 @@ export async function registerZApiRoutes(fastify: FastifyInstance) {
    * Health check do serviço Z-API
    */
   fastify.get('/api/zapi/health', async (request: any, reply: any) => {
+    const tenantId = request.query?.tenantId as string | undefined;
+    const configured = await zapiService.isConfigured(tenantId);
+    
     return reply.status(200).send({
-      configured: zapiService.isConfigured(),
-      zapiInstanceId: process.env.ZAPI_INSTANCE_ID ? 'configured' : 'not configured',
-      zapiToken: process.env.ZAPI_TOKEN ? 'configured' : 'not configured',
+      configured,
+      tenantId: tenantId || 'global',
+      zapiInstanceId: process.env.ZAPI_INSTANCE_ID ? 'configured (env)' : 'not configured',
+      zapiToken: process.env.ZAPI_TOKEN ? 'configured (env)' : 'not configured',
       zapiBaseUrl: process.env.ZAPI_BASE_URL || 'https://api.z-api.io',
+      note: 'Configurations can come from IntegrationConfig (database) or environment variables',
     });
   });
 

@@ -3,14 +3,17 @@
  * Decide automaticamente entre IA (OpenAI) ou Fallback
  */
 
+import { FastifyInstance } from 'fastify';
 import { fallbackLeadClassifier } from './leadFallbackClassifier';
 import { aiLeadClassifier } from './leadAiClassifier';
+import { IntegrationConfigService } from './integrationConfig.service';
 
 interface ClassificationInput {
   nome: string;
   telefone: string;
   email?: string;
   origem?: string;
+  tenantId?: string; // Adicionado para suportar multi-tenant
 }
 
 interface ClassificationResult {
@@ -22,15 +25,31 @@ interface ClassificationResult {
 }
 
 export async function classifyLead(
-  input: ClassificationInput
+  input: ClassificationInput,
+  fastify?: FastifyInstance
 ): Promise<ClassificationResult> {
-  // Tenta usar IA se OpenAI estiver configurado
+  // Tenta usar IA se OpenAI estiver configurado (banco ou env)
   try {
-    if (process.env.OPENAI_API_KEY) {
-      return await aiLeadClassifier(input);
+    let hasOpenAI = false;
+
+    // Verificar se OpenAI está configurado via IntegrationConfigService
+    if (fastify) {
+      const configService = new IntegrationConfigService(fastify);
+      hasOpenAI = await configService.isConfigured('openai', input.tenantId);
+    } else {
+      // Fallback: verificar env var diretamente
+      hasOpenAI = !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '' && process.env.OPENAI_API_KEY !== 'sua-chave-aqui');
     }
-  } catch (err) {
-    console.warn('AI classification failed, using fallback:', err);
+
+    if (hasOpenAI) {
+      return await aiLeadClassifier(input, fastify);
+    }
+  } catch (err: any) {
+    if (fastify) {
+      fastify.log.warn({ error: err, tenantId: input.tenantId }, 'AI classification failed, using fallback');
+    } else {
+      console.warn('AI classification failed, using fallback:', err);
+    }
   }
 
   // Fallback automático (sempre funciona)

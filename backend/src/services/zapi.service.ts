@@ -14,6 +14,7 @@ import { PrismaClient } from '@prisma/client';
 import { getOrCreateTenantByClienteId } from '../utils/tenant';
 import { AgentService } from './agent.service';
 import { ElevenLabsService } from './elevenlabs.service';
+import { IntegrationConfigService } from './integrationConfig.service';
 
 export interface ZApiMessage {
   from: string; // Número do remetente
@@ -35,34 +36,26 @@ export interface ZApiWebhookData {
 }
 
 export class ZApiService {
-  private zapiInstanceId: string;
-  private zapiToken: string;
-  private zapiBaseUrl: string;
   private agentService: AgentService;
   private elevenlabsService: ElevenLabsService;
+  private integrationConfigService: IntegrationConfigService;
   private fastify: FastifyInstance;
   private prisma: PrismaClient;
 
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;
     this.prisma = fastify.prisma as PrismaClient;
-    this.zapiInstanceId = process.env.ZAPI_INSTANCE_ID || '';
-    this.zapiToken = process.env.ZAPI_TOKEN || '';
-    this.zapiBaseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io';
     this.agentService = new AgentService(fastify);
     this.elevenlabsService = new ElevenLabsService(fastify);
-
-    // Validar configuração
-    if (!this.zapiInstanceId || !this.zapiToken) {
-      fastify.log.warn('Z-API não configurada. WhatsApp service desabilitado.');
-    }
+    this.integrationConfigService = new IntegrationConfigService(fastify);
   }
 
   /**
-   * Verifica se Z-API está configurada
+   * Verifica se Z-API está configurada para um tenant específico
+   * Se tenantId não for fornecido, verifica env vars globais
    */
-  isConfigured(): boolean {
-    return !!(this.zapiInstanceId && this.zapiToken);
+  async isConfigured(tenantId?: string): Promise<boolean> {
+    return await this.integrationConfigService.isConfigured('zapi', tenantId);
   }
 
   /**
@@ -251,18 +244,25 @@ export class ZApiService {
 
   /**
    * Envia mensagem via Z-API
+   * Busca configurações do banco (por tenant) ou env vars como fallback
    */
   async sendMessage(to: string, message: string, tenantId?: string): Promise<void> {
     try {
-      if (!this.isConfigured()) {
+      // Buscar configurações do Z-API (banco primeiro, depois env vars)
+      const config = await this.integrationConfigService.getConfig(tenantId);
+      
+      if (!config.zapiInstanceId || !config.zapiToken) {
+        this.fastify.log.warn({ tenantId, source: config.source }, 'Z-API não configurada. Mensagem não enviada.');
         throw new Error('Z-API não configurada');
       }
+
+      this.fastify.log.info({ tenantId, source: config.details.zapiInstanceId }, 'Usando Z-API para enviar mensagem');
 
       // Normalizar número
       const normalizedTo = this.normalizePhone(to);
 
       // URL da API Z-API
-      const url = `${this.zapiBaseUrl}/instances/${this.zapiInstanceId}/token/${this.zapiToken}/send-text`;
+      const url = `${config.zapiBaseUrl}/instances/${config.zapiInstanceId}/token/${config.zapiToken}/send-text`;
 
       // Enviar mensagem
       const response = await axios.post(
@@ -278,7 +278,7 @@ export class ZApiService {
         }
       );
 
-      this.fastify.log.info({ to: normalizedTo, response: response.data }, 'Mensagem enviada via Z-API');
+      this.fastify.log.info({ to: normalizedTo, response: response.data, tenantId, source: config.details.zapiInstanceId }, 'Mensagem enviada via Z-API');
 
       // Verificar se deve enviar áudio (se configurado)
       if (tenantId) {
@@ -300,13 +300,13 @@ export class ZApiService {
           );
 
           if (shouldUseAudio) {
-            await this.sendAudioMessage(normalizedTo, message, voiceConfig, tenantId);
+            await this.sendAudioMessage(normalizedTo, message, tenantId);
             return; // Não enviar texto se enviar áudio
           }
         }
       }
     } catch (error: any) {
-      this.fastify.log.error({ error, to }, 'Erro ao enviar mensagem via Z-API');
+      this.fastify.log.error({ error, to, tenantId }, 'Erro ao enviar mensagem via Z-API');
       throw error;
     }
   }
@@ -361,6 +361,17 @@ export class ZApiService {
     tenantId: string
   ): Promise<void> {
     try {
+      // Buscar configurações do Z-API (banco primeiro, depois env vars)
+      const config = await this.integrationConfigService.getConfig(tenantId);
+      
+      if (!config.zapiInstanceId || !config.zapiToken) {
+        this.fastify.log.warn({ tenantId, source: config.source }, 'Z-API não configurada. Mensagem de áudio não enviada.');
+        await this.sendMessage(to, text, tenantId);
+        return;
+      }
+
+      this.fastify.log.info({ tenantId, source: config.details.zapiInstanceId }, 'Usando Z-API para enviar áudio');
+
       // Buscar configuração de voz
       const voiceConfig = await this.prisma.voiceConfig.findUnique({
         where: { tenantId },
@@ -400,6 +411,7 @@ export class ZApiService {
 
       if (!audioResult.success || !audioResult.audioBuffer) {
         this.fastify.log.warn('Falha ao gerar áudio, enviando texto');
+        await this.sendMessage(to, text, tenantId);
         return;
       }
 
@@ -407,7 +419,7 @@ export class ZApiService {
       const audioBase64 = audioResult.audioBuffer.toString('base64');
 
       // Enviar áudio via Z-API
-      const url = `${this.zapiBaseUrl}/instances/${this.zapiInstanceId}/token/${this.zapiToken}/send-audio-base64`;
+      const url = `${config.zapiBaseUrl}/instances/${config.zapiInstanceId}/token/${config.zapiToken}/send-audio-base64`;
 
       await axios.post(
         url,
@@ -423,9 +435,9 @@ export class ZApiService {
         }
       );
 
-      this.fastify.log.info({ to }, 'Áudio enviado via Z-API');
+      this.fastify.log.info({ to, tenantId }, 'Áudio enviado via Z-API');
     } catch (error: any) {
-      this.fastify.log.error({ error }, 'Erro ao enviar áudio via Z-API');
+      this.fastify.log.error({ error, tenantId }, 'Erro ao enviar áudio via Z-API');
       // Fallback: enviar como texto
       await this.sendMessage(to, text, tenantId);
     }

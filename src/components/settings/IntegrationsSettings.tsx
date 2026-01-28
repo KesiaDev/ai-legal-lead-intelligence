@@ -60,15 +60,6 @@ export function IntegrationsSettings() {
       clearTimeout(autoSaveTimeout);
     }
 
-    // Salvar temporariamente no localStorage para tokens sensíveis
-    if (fieldName === 'openaiApiKey' && value) {
-      localStorage.setItem('openai_api_key_temp', value);
-    } else if (fieldName === 'evolutionApiKey' && value) {
-      localStorage.setItem('evolution_api_key_temp', value);
-    } else if (fieldName === 'zapiToken' && value) {
-      localStorage.setItem('zapi_token_temp', value);
-    }
-
     // Auto-save após 2 segundos de inatividade
     const timeout = window.setTimeout(async () => {
       if (value && value.trim().length > 0 && user && token) {
@@ -128,46 +119,19 @@ export function IntegrationsSettings() {
           });
           
           setFormData({
-            // Para API keys, mostrar valor do localStorage temporário se existir, senão string vazia
+            // Campos de texto sempre vazios (não mostramos valores completos por segurança)
             // O indicador visual será mostrado baseado em savedKeys
-            openaiApiKey: hasOpenAIKey 
-              ? (localStorage.getItem('openai_api_key_temp') || '') 
-              : '',
+            openaiApiKey: '',
             evolutionApiUrl: config.evolutionApiUrl || '',
-            evolutionApiKey: hasEvolutionKey
-              ? (localStorage.getItem('evolution_api_key_temp') || '')
-              : '',
+            evolutionApiKey: '',
             evolutionInstance: config.evolutionInstance || '',
             zapiInstanceId: config.zapiInstanceId || '',
-            zapiToken: hasZapiToken
-              ? (localStorage.getItem('zapi_token_temp') || '')
-              : '',
+            zapiToken: '',
             zapiBaseUrl: config.zapiBaseUrl || 'https://api.z-api.io',
           });
-        } else {
-          // Fallback para localStorage
-          const saved = localStorage.getItem('integration_config');
-          if (saved) {
-            try {
-              const parsed = JSON.parse(saved);
-              setFormData(parsed);
-            } catch (e) {
-              console.error('Erro ao carregar configurações:', e);
-            }
-          }
         }
       } catch (error) {
         console.error('Erro ao carregar configurações do backend:', error);
-        // Fallback para localStorage
-        const saved = localStorage.getItem('integration_config');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setFormData(parsed);
-          } catch (e) {
-            console.error('Erro ao carregar configurações:', e);
-          }
-        }
       }
     };
 
@@ -295,25 +259,13 @@ export function IntegrationsSettings() {
         setSavedKeys(newSavedKeys);
       }
 
-      // Também salvar no localStorage para referência (sem tokens completos por segurança)
-      const safeFormData = {
+      // Limpar campos de input após salvar (por segurança)
+      setFormData({
         ...formData,
-        openaiApiKey: formData.openaiApiKey ? '***' : '',
-        evolutionApiKey: formData.evolutionApiKey ? '***' : '',
-        zapiToken: formData.zapiToken ? '***' : '',
-      };
-      localStorage.setItem('integration_config', JSON.stringify(safeFormData));
-
-      // Salvar tokens temporariamente no localStorage para não perder ao recarregar
-      if (formData.openaiApiKey) {
-        localStorage.setItem('openai_api_key_temp', formData.openaiApiKey);
-      }
-      if (formData.evolutionApiKey) {
-        localStorage.setItem('evolution_api_key_temp', formData.evolutionApiKey);
-      }
-      if (formData.zapiToken) {
-        localStorage.setItem('zapi_token_temp', formData.zapiToken);
-      }
+        openaiApiKey: '',
+        evolutionApiKey: '',
+        zapiToken: '',
+      });
 
       toast({
         title: 'Configurações salvas!',
@@ -369,9 +321,9 @@ export function IntegrationsSettings() {
     setTestResults({ ...testResults, [type]: 'pending' });
 
     try {
-      if (type === 'openai' && (formData.openaiApiKey || savedKeys.openaiApiKey)) {
-        // Buscar chave completa: primeiro do formData, senão do localStorage temporário
-        const apiKey = formData.openaiApiKey || localStorage.getItem('openai_api_key_temp') || '';
+      if (type === 'openai' && formData.openaiApiKey) {
+        // Usar chave do formData (usuário deve digitar para testar)
+        const apiKey = formData.openaiApiKey || '';
         
         if (!apiKey) {
           throw new Error('Chave da OpenAI não encontrada. Digite a chave completa para testar.');

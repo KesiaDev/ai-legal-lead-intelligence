@@ -14,6 +14,7 @@ import { PrismaClient } from '@prisma/client';
 import { getOrCreateTenantByClienteId } from '../utils/tenant';
 import { AgentService } from './agent.service';
 import { ElevenLabsService } from './elevenlabs.service';
+import { IntegrationConfigService } from './integrationConfig.service';
 
 export interface WhatsAppMessage {
   from: string; // Número do remetente
@@ -55,27 +56,18 @@ export interface WhatsAppWebhookData {
 }
 
 export class WhatsAppService {
-  private evolutionApiUrl: string;
-  private evolutionApiKey: string;
-  private evolutionInstance: string;
   private agentService: AgentService;
   private elevenlabsService: ElevenLabsService;
+  private integrationConfigService: IntegrationConfigService;
   private fastify: FastifyInstance;
   private prisma: PrismaClient;
 
   constructor(fastify: FastifyInstance) {
     this.fastify = fastify;
     this.prisma = fastify.prisma as PrismaClient;
-    this.evolutionApiUrl = process.env.EVOLUTION_API_URL || '';
-    this.evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
-    this.evolutionInstance = process.env.EVOLUTION_INSTANCE || '';
     this.agentService = new AgentService(fastify);
     this.elevenlabsService = new ElevenLabsService(fastify);
-
-    // Validar configuração
-    if (!this.evolutionApiUrl || !this.evolutionApiKey || !this.evolutionInstance) {
-      fastify.log.warn('Evolution API não configurada. WhatsApp service desabilitado.');
-    }
+    this.integrationConfigService = new IntegrationConfigService(fastify);
   }
 
   /**
@@ -194,20 +186,25 @@ export class WhatsAppService {
         // Verificar se deve enviar resposta em áudio
         const shouldUseAudio = await this.shouldUseAudio(tenantId, message.type, message.message);
         
-        if (shouldUseAudio) {
-          await this.sendAudioMessage(message.from, agentResponse.response, tenantId || '');
+        if (shouldUseAudio && tenantId) {
+          await this.sendAudioMessage(message.from, agentResponse.response, tenantId);
         } else {
-          await this.sendMessage(message.from, agentResponse.response);
+          await this.sendMessage(message.from, agentResponse.response, tenantId);
         }
       }
 
     } catch (error: any) {
-      this.fastify.log.error({ error }, 'Erro ao processar mensagem');
-      // Enviar mensagem de erro genérica
-      await this.sendMessage(
-        message.from,
-        'Desculpe, ocorreu um erro ao processar sua mensagem. Nossa equipe foi notificada e entrará em contato em breve.'
-      );
+      this.fastify.log.error({ error, tenantId }, 'Erro ao processar mensagem');
+      // Enviar mensagem de erro genérica (tentar enviar mesmo sem tenantId)
+      try {
+        await this.sendMessage(
+          message.from,
+          'Desculpe, ocorreu um erro ao processar sua mensagem. Nossa equipe foi notificada e entrará em contato em breve.',
+          tenantId
+        );
+      } catch (sendError: any) {
+        this.fastify.log.error({ error: sendError }, 'Erro ao enviar mensagem de erro');
+      }
     }
   }
 
@@ -336,10 +333,15 @@ export class WhatsAppService {
     text: string,
     tenantId: string
   ): Promise<void> {
-    if (!this.evolutionApiUrl || !this.evolutionApiKey || !this.evolutionInstance) {
-      this.fastify.log.warn('Evolution API não configurada. Mensagem de áudio não enviada.');
+    // Buscar configurações do Evolution API (banco primeiro, depois env vars)
+    const config = await this.integrationConfigService.getConfig(tenantId);
+    
+    if (!config.evolutionApiUrl || !config.evolutionApiKey || !config.evolutionInstance) {
+      this.fastify.log.warn({ tenantId, source: config.source }, 'Evolution API não configurada. Mensagem de áudio não enviada.');
       return;
     }
+
+    this.fastify.log.info({ tenantId, source: config.details.evolutionApiUrl }, 'Usando Evolution API para enviar áudio');
 
     try {
       // Buscar configuração de voz
@@ -349,7 +351,7 @@ export class WhatsAppService {
 
       if (!voiceConfig || !voiceConfig.enabled || !voiceConfig.elevenlabsApiKey) {
         this.fastify.log.warn({ tenantId }, 'Voz não configurada. Enviando texto.');
-        await this.sendMessage(to, text);
+        await this.sendMessage(to, text, tenantId);
         return;
       }
 
@@ -360,7 +362,7 @@ export class WhatsAppService {
           { estimatedDuration, maxDuration: voiceConfig.maxAudioDuration },
           'Texto muito longo para áudio. Enviando texto.'
         );
-        await this.sendMessage(to, text);
+        await this.sendMessage(to, text, tenantId);
         return;
       }
 
@@ -384,7 +386,7 @@ export class WhatsAppService {
           { error: audioResult.error },
           'Erro ao gerar áudio. Enviando texto.'
         );
-        await this.sendMessage(to, text);
+        await this.sendMessage(to, text, tenantId);
         return;
       }
 
@@ -392,10 +394,10 @@ export class WhatsAppService {
       const audioBase64 = audioResult.audioBuffer.toString('base64');
 
       // Enviar áudio via Evolution API
-      const instanceEncoded = encodeURIComponent(this.evolutionInstance);
-      const url = `${this.evolutionApiUrl}/message/sendMedia/${instanceEncoded}`;
+      const instanceEncoded = encodeURIComponent(config.evolutionInstance!);
+      const url = `${config.evolutionApiUrl}/message/sendMedia/${instanceEncoded}`;
 
-      this.fastify.log.info({ to }, 'Enviando mensagem de áudio via Evolution API');
+      this.fastify.log.info({ to, tenantId, source: config.details.evolutionApiUrl }, 'Enviando mensagem de áudio via Evolution API');
 
       await axios.post(
         url,
@@ -408,46 +410,52 @@ export class WhatsAppService {
         },
         {
           headers: {
-            apikey: this.evolutionApiKey,
+            apikey: config.evolutionApiKey!,
             'Content-Type': 'application/json',
           },
           timeout: 30000, // 30 segundos
         }
       );
 
-      this.fastify.log.info({ to }, 'Mensagem de áudio enviada com sucesso');
+      this.fastify.log.info({ to, tenantId }, 'Mensagem de áudio enviada com sucesso');
 
     } catch (error: any) {
       this.fastify.log.error(
-        { error: error.message, response: error.response?.data },
+        { error: error.message, response: error.response?.data, tenantId },
         'Erro ao enviar mensagem de áudio. Tentando enviar texto.'
       );
       
       // Fallback: enviar como texto
       try {
-        await this.sendMessage(to, text);
+        await this.sendMessage(to, text, tenantId);
       } catch (textError: any) {
-        this.fastify.log.error({ error: textError }, 'Erro ao enviar mensagem de texto como fallback');
+        this.fastify.log.error({ error: textError, tenantId }, 'Erro ao enviar mensagem de texto como fallback');
       }
     }
   }
 
   /**
    * Envia mensagem via Evolution API
+   * Busca configurações do banco (por tenant) ou env vars como fallback
    */
-  async sendMessage(to: string, message: string): Promise<void> {
-    if (!this.evolutionApiUrl || !this.evolutionApiKey || !this.evolutionInstance) {
-      this.fastify.log.warn('Evolution API não configurada. Mensagem não enviada.');
+  async sendMessage(to: string, message: string, tenantId?: string): Promise<void> {
+    // Buscar configurações do Evolution API (banco primeiro, depois env vars)
+    const config = await this.integrationConfigService.getConfig(tenantId);
+    
+    if (!config.evolutionApiUrl || !config.evolutionApiKey || !config.evolutionInstance) {
+      this.fastify.log.warn({ tenantId, source: config.source }, 'Evolution API não configurada. Mensagem não enviada.');
       return;
     }
 
+    this.fastify.log.info({ tenantId, source: config.details.evolutionApiUrl }, 'Usando Evolution API para enviar mensagem');
+
     try {
       // URL encode do nome da instância (pode ter espaços)
-      const instanceEncoded = encodeURIComponent(this.evolutionInstance);
+      const instanceEncoded = encodeURIComponent(config.evolutionInstance);
 
-      const url = `${this.evolutionApiUrl}/message/sendText/${instanceEncoded}`;
+      const url = `${config.evolutionApiUrl}/message/sendText/${instanceEncoded}`;
 
-      this.fastify.log.info({ to, url }, 'Enviando mensagem via Evolution API');
+      this.fastify.log.info({ to, url, tenantId, source: config.details.evolutionApiUrl }, 'Enviando mensagem via Evolution API');
 
       const response = await axios.post(
         url,
@@ -459,14 +467,14 @@ export class WhatsAppService {
         },
         {
           headers: {
-            apikey: this.evolutionApiKey,
+            apikey: config.evolutionApiKey!,
             'Content-Type': 'application/json',
           },
           timeout: 10000, // 10 segundos
         }
       );
 
-      this.fastify.log.info({ response: response.data }, 'Mensagem enviada com sucesso');
+      this.fastify.log.info({ response: response.data, tenantId }, 'Mensagem enviada com sucesso');
 
       // Salvar mensagem no banco
       // TODO: Associar com lead correto
@@ -476,7 +484,8 @@ export class WhatsAppService {
         {
           error: error.message,
           response: error.response?.data,
-          url,
+          tenantId,
+          source: config.source,
         },
         'Erro ao enviar mensagem via Evolution API'
       );
@@ -485,13 +494,10 @@ export class WhatsAppService {
   }
 
   /**
-   * Verifica se o serviço está configurado
+   * Verifica se o serviço está configurado para um tenant específico
+   * Se tenantId não for fornecido, verifica env vars globais
    */
-  isConfigured(): boolean {
-    return !!(
-      this.evolutionApiUrl &&
-      this.evolutionApiKey &&
-      this.evolutionInstance
-    );
+  async isConfigured(tenantId?: string): Promise<boolean> {
+    return await this.integrationConfigService.isConfigured('evolution', tenantId);
   }
 }
