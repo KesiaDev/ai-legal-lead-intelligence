@@ -241,28 +241,101 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         where: { tenantId },
       });
 
-      // Atualizar com os dados recebidos, mantendo valores existentes quando não fornecidos
-      const updated = await prisma.voiceConfig.update({
-        where: { tenantId },
-        data: {
-          provider: body.provider !== undefined ? body.provider : existing!.provider,
-          elevenlabsApiKey: body.elevenlabsApiKey !== undefined ? body.elevenlabsApiKey : existing!.elevenlabsApiKey,
-          voiceId: body.voiceId !== undefined ? body.voiceId : existing!.voiceId,
-          voiceName: body.voiceName !== undefined ? body.voiceName : existing!.voiceName,
-          audioResponseProbabilityOnText: body.audioResponseProbabilityOnText !== undefined ? body.audioResponseProbabilityOnText : existing!.audioResponseProbabilityOnText,
-          audioResponseProbabilityOnAudio: body.audioResponseProbabilityOnAudio !== undefined ? body.audioResponseProbabilityOnAudio : existing!.audioResponseProbabilityOnAudio,
-          audioResponseProbabilityOnMedia: body.audioResponseProbabilityOnMedia !== undefined ? body.audioResponseProbabilityOnMedia : existing!.audioResponseProbabilityOnMedia,
-          maxAudioDuration: body.maxAudioDuration !== undefined ? body.maxAudioDuration : existing!.maxAudioDuration,
-          textToSpeechAdjustment: body.textToSpeechAdjustment !== undefined ? body.textToSpeechAdjustment : existing!.textToSpeechAdjustment,
-          textOnlyKeywords: body.textOnlyKeywords !== undefined ? body.textOnlyKeywords : existing!.textOnlyKeywords,
-          voiceStability: body.voiceStability !== undefined ? body.voiceStability : existing!.voiceStability,
-          voiceSimilarityBoost: body.voiceSimilarityBoost !== undefined ? body.voiceSimilarityBoost : existing!.voiceSimilarityBoost,
-          voiceStyle: body.voiceStyle !== undefined ? body.voiceStyle : existing!.voiceStyle,
-          voiceSpeed: body.voiceSpeed !== undefined ? body.voiceSpeed : existing!.voiceSpeed,
-          enabled: body.enabled !== undefined ? body.enabled : existing!.enabled,
-          updatedAt: new Date(),
-        },
-      });
+      if (!existing) {
+        throw new Error('Configuração não encontrada após upsert');
+      }
+
+      // Construir objeto de atualização apenas com campos fornecidos
+      const updateData: any = {};
+      
+      if (body.provider !== undefined) updateData.provider = body.provider;
+      if (body.elevenlabsApiKey !== undefined) updateData.elevenlabsApiKey = body.elevenlabsApiKey === null || body.elevenlabsApiKey === '' ? null : body.elevenlabsApiKey;
+      if (body.voiceId !== undefined) updateData.voiceId = body.voiceId;
+      if (body.voiceName !== undefined) updateData.voiceName = body.voiceName;
+      if (body.audioResponseProbabilityOnText !== undefined) updateData.audioResponseProbabilityOnText = body.audioResponseProbabilityOnText;
+      if (body.audioResponseProbabilityOnAudio !== undefined) updateData.audioResponseProbabilityOnAudio = body.audioResponseProbabilityOnAudio;
+      if (body.audioResponseProbabilityOnMedia !== undefined) updateData.audioResponseProbabilityOnMedia = body.audioResponseProbabilityOnMedia;
+      if (body.maxAudioDuration !== undefined) updateData.maxAudioDuration = body.maxAudioDuration;
+      if (body.textToSpeechAdjustment !== undefined) updateData.textToSpeechAdjustment = body.textToSpeechAdjustment;
+      if (body.textOnlyKeywords !== undefined) updateData.textOnlyKeywords = body.textOnlyKeywords;
+      if (body.voiceStability !== undefined) updateData.voiceStability = body.voiceStability;
+      if (body.voiceSimilarityBoost !== undefined) updateData.voiceSimilarityBoost = body.voiceSimilarityBoost;
+      if (body.voiceStyle !== undefined) updateData.voiceStyle = body.voiceStyle;
+      if (body.voiceSpeed !== undefined) updateData.voiceSpeed = body.voiceSpeed;
+      if (body.enabled !== undefined) updateData.enabled = body.enabled;
+
+      // Se não há nada para atualizar, retornar sucesso
+      if (Object.keys(updateData).length === 0) {
+        fastify.log.info({ tenantId }, 'Nenhum campo para atualizar, retornando configuração existente');
+        return reply.status(200).send({
+          success: true,
+          message: 'Nenhuma alteração necessária',
+        });
+      }
+
+      // Tentar atualizar com tratamento de erro específico
+      let updated;
+      try {
+        fastify.log.info({ 
+          tenantId, 
+          updateFields: Object.keys(updateData),
+        }, 'Tentando atualizar VoiceConfig');
+        
+        updated = await prisma.voiceConfig.update({
+          where: { tenantId },
+          data: updateData,
+        });
+        
+        fastify.log.info({ tenantId, success: true }, 'Update de VoiceConfig bem-sucedido');
+      } catch (updateError: any) {
+        // Log detalhado do erro de update
+        fastify.log.error({ 
+          tenantId,
+          error: updateError.message,
+          code: updateError.code,
+          meta: updateError.meta,
+          stack: updateError.stack,
+          updateDataKeys: Object.keys(updateData),
+        }, 'ERRO ESPECÍFICO ao fazer update de VoiceConfig');
+        
+        // Se erro for "record not found", tentar criar novamente
+        if (updateError.code === 'P2025') {
+          fastify.log.warn({ tenantId }, 'Registro não encontrado no update, tentando criar novamente');
+          try {
+            updated = await prisma.voiceConfig.create({
+              data: {
+                tenantId,
+                provider: updateData.provider ?? 'elevenlabs',
+                elevenlabsApiKey: updateData.elevenlabsApiKey ?? null,
+                voiceId: updateData.voiceId ?? 'EXAVITQu4vr4xnSDxMaL',
+                voiceName: updateData.voiceName ?? 'Sarah - Profissional Feminina',
+                audioResponseProbabilityOnText: updateData.audioResponseProbabilityOnText ?? 'nunca',
+                audioResponseProbabilityOnAudio: updateData.audioResponseProbabilityOnAudio ?? 'alta',
+                audioResponseProbabilityOnMedia: updateData.audioResponseProbabilityOnMedia ?? 'baixa',
+                maxAudioDuration: updateData.maxAudioDuration ?? 60,
+                textToSpeechAdjustment: updateData.textToSpeechAdjustment ?? 'moderado',
+                textOnlyKeywords: updateData.textOnlyKeywords ?? [],
+                voiceStability: updateData.voiceStability ?? 0.5,
+                voiceSimilarityBoost: updateData.voiceSimilarityBoost ?? 0.75,
+                voiceStyle: updateData.voiceStyle ?? 0.3,
+                voiceSpeed: updateData.voiceSpeed ?? 1.0,
+                enabled: updateData.enabled ?? false,
+              },
+            });
+            fastify.log.info({ tenantId }, 'Registro criado com sucesso após falha no update');
+          } catch (createError: any) {
+            fastify.log.error({ 
+              tenantId,
+              error: createError.message,
+              code: createError.code,
+            }, 'Erro ao criar registro após falha no update');
+            throw createError;
+          }
+        } else {
+          // Re-throw para ser capturado pelo catch externo
+          throw updateError;
+        }
+      }
 
       fastify.log.info({ tenantId }, 'Configuração de voz atualizada');
       return reply.status(200).send({
@@ -270,10 +343,54 @@ export async function registerVoiceRoutes(fastify: FastifyInstance) {
         message: 'Configuração de voz atualizada com sucesso',
       });
     } catch (error: any) {
-      fastify.log.error({ error }, 'Erro ao salvar configuração de voz');
-      return reply.status(500).send({
+      // Log detalhado do erro
+      fastify.log.error({ 
+        tenantId: request.user?.tenantId,
+        error: error.message, 
+        stack: error.stack,
+        code: error.code,
+        meta: error.meta,
+        errorName: error.name,
+      }, 'Erro ao salvar configuração de voz');
+      
+      // Tratamento específico para erros comuns
+      let errorMessage = error.message || 'Erro desconhecido';
+      let statusCode = 500;
+      
+      // Erro de tabela não existe (Prisma Client desatualizado)
+      if (error.message?.includes('does not exist') || 
+          error.code === 'P2021' || 
+          error.message?.includes('Unknown table') ||
+          error.meta?.target?.includes('VoiceConfig')) {
+        statusCode = 503;
+        errorMessage = 'Tabela não encontrada. O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.';
+        fastify.log.error({ tenantId: request.user?.tenantId }, 'CRÍTICO: Tabela VoiceConfig não existe - backend precisa reiniciar');
+      }
+      
+      // Erro de constraint (tenantId duplicado, etc)
+      if (error.code === 'P2002') {
+        statusCode = 409;
+        errorMessage = 'Já existe uma configuração para este tenant. Tente atualizar em vez de criar.';
+      }
+      
+      // Erro de conexão com banco
+      if (error.code === 'P1001' || error.message?.includes('connect')) {
+        statusCode = 503;
+        errorMessage = 'Erro de conexão com banco de dados. Tente novamente em alguns segundos.';
+      }
+      
+      // Erro de registro não encontrado
+      if (error.code === 'P2025') {
+        statusCode = 404;
+        errorMessage = 'Configuração não encontrada. Tente recarregar a página.';
+      }
+      
+      return reply.status(statusCode).send({
         error: 'Erro ao salvar configuração de voz',
-        message: error.message || 'Erro interno',
+        message: errorMessage,
+        code: error.code || 'UNKNOWN',
+        // Não expor stack em produção
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
       });
     }
   });

@@ -231,9 +231,7 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
       });
 
       // Atualizar com os dados recebidos
-      const updateData: any = {
-        updatedAt: new Date(),
-      };
+      const updateData: any = {};
 
       if (body.name !== undefined) updateData.name = body.name;
       if (body.description !== undefined) updateData.description = body.description;
@@ -251,10 +249,103 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
       if (body.reminders !== undefined) updateData.reminders = body.reminders;
       if (body.eventConfig !== undefined) updateData.eventConfig = body.eventConfig;
 
-      const config = await fastify.prisma.agentConfig.update({
-        where: { tenantId },
-        data: updateData,
-      });
+      // Se não há nada para atualizar, retornar sucesso sem fazer update
+      if (Object.keys(updateData).length === 0) {
+        fastify.log.info({ tenantId }, 'Nenhum campo para atualizar, retornando configuração existente');
+        const existingConfig = await fastify.prisma.agentConfig.findUnique({
+          where: { tenantId },
+        });
+        
+        if (!existingConfig) {
+          throw new Error('Configuração não encontrada após upsert');
+        }
+        
+        return reply.send({
+          success: true,
+          message: 'Nenhuma alteração necessária',
+          config: {
+            name: existingConfig.name,
+            description: existingConfig.description,
+            isActive: existingConfig.isActive,
+            communicationConfig: existingConfig.communicationConfig,
+            followUpConfig: existingConfig.followUpConfig,
+            scheduleConfig: existingConfig.scheduleConfig,
+            humanizationConfig: existingConfig.humanizationConfig,
+            knowledgeBase: existingConfig.knowledgeBase,
+            intentions: existingConfig.intentions,
+            templates: existingConfig.templates,
+            funnelStages: existingConfig.funnelStages,
+            lawyers: existingConfig.lawyers,
+            rotationRules: existingConfig.rotationRules,
+            reminders: existingConfig.reminders,
+            eventConfig: existingConfig.eventConfig,
+          },
+        });
+      }
+
+      // Tentar atualizar com tratamento de erro específico
+      let config;
+      try {
+        fastify.log.info({ 
+          tenantId, 
+          updateFields: Object.keys(updateData),
+        }, 'Tentando atualizar AgentConfig');
+        
+        config = await fastify.prisma.agentConfig.update({
+          where: { tenantId },
+          data: updateData,
+        });
+        
+        fastify.log.info({ tenantId, success: true }, 'Update de AgentConfig bem-sucedido');
+      } catch (updateError: any) {
+        // Log detalhado do erro de update
+        fastify.log.error({ 
+          tenantId,
+          error: updateError.message,
+          code: updateError.code,
+          meta: updateError.meta,
+          stack: updateError.stack,
+          updateDataKeys: Object.keys(updateData),
+        }, 'ERRO ESPECÍFICO ao fazer update de AgentConfig');
+        
+        // Se erro for "record not found", tentar criar novamente
+        if (updateError.code === 'P2025') {
+          fastify.log.warn({ tenantId }, 'Registro não encontrado no update, tentando criar novamente');
+          try {
+            config = await fastify.prisma.agentConfig.create({
+              data: {
+                tenantId,
+                name: updateData.name ?? 'Agente Padrão',
+                description: updateData.description ?? 'Configuração inicial do agente',
+                isActive: updateData.isActive ?? true,
+                communicationConfig: updateData.communicationConfig ?? null,
+                followUpConfig: updateData.followUpConfig ?? null,
+                scheduleConfig: updateData.scheduleConfig ?? null,
+                humanizationConfig: updateData.humanizationConfig ?? null,
+                knowledgeBase: updateData.knowledgeBase ?? null,
+                intentions: updateData.intentions ?? null,
+                templates: updateData.templates ?? null,
+                funnelStages: updateData.funnelStages ?? null,
+                lawyers: updateData.lawyers ?? null,
+                rotationRules: updateData.rotationRules ?? null,
+                reminders: updateData.reminders ?? null,
+                eventConfig: updateData.eventConfig ?? null,
+              },
+            });
+            fastify.log.info({ tenantId }, 'Registro criado com sucesso após falha no update');
+          } catch (createError: any) {
+            fastify.log.error({ 
+              tenantId,
+              error: createError.message,
+              code: createError.code,
+            }, 'Erro ao criar registro após falha no update');
+            throw createError;
+          }
+        } else {
+          // Re-throw para ser capturado pelo catch externo
+          throw updateError;
+        }
+      }
 
       fastify.log.info({ tenantId }, 'Configurações do agente atualizadas');
 
@@ -280,10 +371,54 @@ export async function registerAgentConfigRoutes(fastify: FastifyInstance) {
         },
       });
     } catch (error: any) {
-      fastify.log.error({ error }, 'Erro ao salvar configurações do agente');
-      return reply.status(500).send({
+      // Log detalhado do erro
+      fastify.log.error({ 
+        tenantId: request.user?.tenantId,
+        error: error.message, 
+        stack: error.stack,
+        code: error.code,
+        meta: error.meta,
+        errorName: error.name,
+      }, 'Erro ao salvar configurações do agente');
+      
+      // Tratamento específico para erros comuns
+      let errorMessage = error.message || 'Erro desconhecido';
+      let statusCode = 500;
+      
+      // Erro de tabela não existe (Prisma Client desatualizado)
+      if (error.message?.includes('does not exist') || 
+          error.code === 'P2021' || 
+          error.message?.includes('Unknown table') ||
+          error.meta?.target?.includes('AgentConfig')) {
+        statusCode = 503;
+        errorMessage = 'Tabela não encontrada. O backend precisa ser reiniciado para aplicar migrations. Aguarde alguns minutos e tente novamente.';
+        fastify.log.error({ tenantId: request.user?.tenantId }, 'CRÍTICO: Tabela AgentConfig não existe - backend precisa reiniciar');
+      }
+      
+      // Erro de constraint (tenantId duplicado, etc)
+      if (error.code === 'P2002') {
+        statusCode = 409;
+        errorMessage = 'Já existe uma configuração para este tenant. Tente atualizar em vez de criar.';
+      }
+      
+      // Erro de conexão com banco
+      if (error.code === 'P1001' || error.message?.includes('connect')) {
+        statusCode = 503;
+        errorMessage = 'Erro de conexão com banco de dados. Tente novamente em alguns segundos.';
+      }
+      
+      // Erro de registro não encontrado
+      if (error.code === 'P2025') {
+        statusCode = 404;
+        errorMessage = 'Configuração não encontrada. Tente recarregar a página.';
+      }
+      
+      return reply.status(statusCode).send({
         error: 'Erro ao salvar configurações',
-        message: error.message || 'Erro desconhecido',
+        message: errorMessage,
+        code: error.code || 'UNKNOWN',
+        // Não expor stack em produção
+        ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
       });
     }
   });

@@ -181,9 +181,7 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       }
 
       // Atualizar sempre um registro existente
-      const updateData: any = {
-        updatedAt: new Date(),
-      };
+      const updateData: any = {};
       
       // Log detalhado do que está sendo recebido
       fastify.log.info({ 
@@ -228,10 +226,92 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         fastify.log.info({ tenantId, hasValue: !!updateData.zapiBaseUrl }, 'Z-API Base URL será atualizada');
       }
       
-      const config = await fastify.prisma.integrationConfig.update({
-        where: { tenantId },
-        data: updateData,
-      });
+      // Se não há nada para atualizar, retornar sucesso sem fazer update
+      if (Object.keys(updateData).length === 0) {
+        fastify.log.info({ tenantId }, 'Nenhum campo para atualizar, retornando configuração existente');
+        const existingConfig = await fastify.prisma.integrationConfig.findUnique({
+          where: { tenantId },
+        });
+        
+        if (!existingConfig) {
+          throw new Error('Configuração não encontrada após upsert');
+        }
+        
+        return reply.send({
+          success: true,
+          message: 'Nenhuma alteração necessária',
+          config: {
+            openaiApiKey: existingConfig.openaiApiKey ? '***' + existingConfig.openaiApiKey.slice(-4) : null,
+            n8nWebhookUrl: existingConfig.n8nWebhookUrl,
+            evolutionApiUrl: existingConfig.evolutionApiUrl,
+            evolutionApiKey: existingConfig.evolutionApiKey ? '***' + existingConfig.evolutionApiKey.slice(-4) : null,
+            evolutionInstance: existingConfig.evolutionInstance,
+            zapiInstanceId: existingConfig.zapiInstanceId,
+            zapiToken: existingConfig.zapiToken ? '***' + existingConfig.zapiToken.slice(-4) : null,
+            zapiBaseUrl: existingConfig.zapiBaseUrl,
+          },
+        });
+      }
+      
+      // Tentar atualizar com tratamento de erro específico
+      let config;
+      try {
+        fastify.log.info({ 
+          tenantId, 
+          updateFields: Object.keys(updateData),
+          updateDataKeys: Object.keys(updateData),
+        }, 'Tentando atualizar IntegrationConfig');
+        
+        config = await fastify.prisma.integrationConfig.update({
+          where: { tenantId },
+          data: updateData,
+        });
+        
+        fastify.log.info({ tenantId, success: true }, 'Update de IntegrationConfig bem-sucedido');
+      } catch (updateError: any) {
+        // Log detalhado do erro de update
+        fastify.log.error({ 
+          tenantId,
+          error: updateError.message,
+          code: updateError.code,
+          meta: updateError.meta,
+          stack: updateError.stack,
+          updateDataKeys: Object.keys(updateData),
+          updateData,
+        }, 'ERRO ESPECÍFICO ao fazer update de IntegrationConfig');
+        
+        // Se erro for "record not found", tentar criar novamente
+        if (updateError.code === 'P2025') {
+          fastify.log.warn({ tenantId }, 'Registro não encontrado no update, tentando criar novamente');
+          try {
+            config = await fastify.prisma.integrationConfig.create({
+              data: {
+                tenantId,
+                ...updateData,
+                openaiApiKey: updateData.openaiApiKey ?? null,
+                n8nWebhookUrl: updateData.n8nWebhookUrl ?? null,
+                evolutionApiUrl: updateData.evolutionApiUrl ?? null,
+                evolutionApiKey: updateData.evolutionApiKey ?? null,
+                evolutionInstance: updateData.evolutionInstance ?? null,
+                zapiInstanceId: updateData.zapiInstanceId ?? null,
+                zapiToken: updateData.zapiToken ?? null,
+                zapiBaseUrl: updateData.zapiBaseUrl ?? 'https://api.z-api.io',
+              },
+            });
+            fastify.log.info({ tenantId }, 'Registro criado com sucesso após falha no update');
+          } catch (createError: any) {
+            fastify.log.error({ 
+              tenantId,
+              error: createError.message,
+              code: createError.code,
+            }, 'Erro ao criar registro após falha no update');
+            throw createError;
+          }
+        } else {
+          // Re-throw para ser capturado pelo catch externo
+          throw updateError;
+        }
+      }
 
       // Log detalhado do que foi salvo (sem mostrar valores completos por segurança)
       fastify.log.info({ 
