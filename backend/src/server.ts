@@ -1762,6 +1762,137 @@ async function build() {
     }
   });
 
+  // ======================================================
+  // ENDPOINT TEMPORÁRIO: Salvar chave OpenAI diretamente
+  // ======================================================
+  // Endpoint para salvar chave da OpenAI para um usuário específico
+  // Uso: POST /api/admin/save-openai-key
+  // Body: { userIdentifier: "kesiawnandi", openaiKey: "sk-proj-...", secret: "admin-secret-2026" }
+  fastify.post('/api/admin/save-openai-key', async (request, reply) => {
+    try {
+      const { userIdentifier, openaiKey, secret } = request.body as {
+        userIdentifier?: string;
+        openaiKey?: string;
+        secret?: string;
+      };
+
+      // Verificação simples de segurança (remover após uso)
+      if (secret !== 'admin-save-key-2026') {
+        return reply.status(401).send({
+          error: 'Não autorizado',
+          message: 'Secret inválido',
+        });
+      }
+
+      if (!userIdentifier || !openaiKey) {
+        return reply.status(400).send({
+          error: 'Campos obrigatórios',
+          message: 'userIdentifier e openaiKey são obrigatórios',
+        });
+      }
+
+      if (!openaiKey.startsWith('sk-')) {
+        return reply.status(400).send({
+          error: 'Chave inválida',
+          message: 'A chave da OpenAI deve começar com "sk-"',
+        });
+      }
+
+      fastify.log.info({ userIdentifier }, 'Buscando usuário para salvar chave OpenAI');
+
+      // Buscar usuário por email ou nome
+      let user = await prisma.user.findUnique({
+        where: { email: userIdentifier },
+        include: { tenant: true },
+      });
+
+      if (!user) {
+        // Tentar buscar por nome ou email parcial
+        const users = await prisma.user.findMany({
+          where: {
+            OR: [
+              { email: { contains: userIdentifier, mode: 'insensitive' } },
+              { name: { contains: userIdentifier, mode: 'insensitive' } },
+            ],
+          },
+          include: { tenant: true },
+        });
+
+        if (users.length === 0) {
+          return reply.status(404).send({
+            error: 'Usuário não encontrado',
+            message: `Nenhum usuário encontrado com identificador: ${userIdentifier}`,
+          });
+        }
+
+        if (users.length > 1) {
+          return reply.status(400).send({
+            error: 'Múltiplos usuários encontrados',
+            message: 'Use o email completo para identificar o usuário',
+            users: users.map(u => ({ email: u.email, name: u.name, tenantId: u.tenantId })),
+          });
+        }
+
+        user = users[0];
+      }
+
+      const tenantId = user.tenantId;
+
+      fastify.log.info({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        tenantId,
+        tenantName: user.tenant.name,
+      }, 'Usuário encontrado, salvando chave OpenAI');
+
+      // Fazer upsert da chave da OpenAI
+      const config = await prisma.integrationConfig.upsert({
+        where: { tenantId },
+        update: {
+          openaiApiKey: openaiKey,
+        },
+        create: {
+          tenantId,
+          openaiApiKey: openaiKey,
+          n8nWebhookUrl: null,
+          evolutionApiUrl: null,
+          evolutionApiKey: null,
+          evolutionInstance: null,
+          zapiInstanceId: null,
+          zapiToken: null,
+          zapiBaseUrl: 'https://api.z-api.io',
+        },
+      });
+
+      fastify.log.info({
+        tenantId,
+        keyPreview: `...${openaiKey.slice(-4)}`,
+      }, 'Chave OpenAI salva com sucesso');
+
+      return reply.send({
+        success: true,
+        message: 'Chave da OpenAI salva com sucesso',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+        tenant: {
+          id: tenantId,
+          name: user.tenant.name,
+        },
+        keyPreview: `...${openaiKey.slice(-4)}`,
+      });
+    } catch (error: any) {
+      fastify.log.error({ error: error.message, stack: error.stack }, 'Erro ao salvar chave OpenAI');
+      return reply.status(500).send({
+        error: 'Erro ao salvar chave',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
   return fastify;
 }
 
