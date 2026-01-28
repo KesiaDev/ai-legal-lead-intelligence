@@ -39,6 +39,8 @@ export function IntegrationsSettings() {
   const [testResults, setTestResults] = useState<Record<string, 'success' | 'error' | 'pending' | null>>({});
   const [autoSaveTimeout, setAutoSaveTimeout] = useState<number | null>(null);
   const [lastSavedField, setLastSavedField] = useState<string | null>(null);
+  // Estado para rastrear quais chaves existem no backend (mascaradas)
+  const [savedKeys, setSavedKeys] = useState<Record<string, string>>({});
 
   // Função helper para auto-save de qualquer campo
   const handleAutoSave = (fieldName: keyof IntegrationConfig, value: string) => {
@@ -115,21 +117,32 @@ export function IntegrationsSettings() {
         
         // Se tiver configurações no backend, usar
         if (config) {
+          // Detectar quais chaves existem no backend (vêm mascaradas como ***XXXX)
+          const hasOpenAIKey = config.openaiApiKey && config.openaiApiKey !== 'null' && config.openaiApiKey.startsWith('***');
+          const hasEvolutionKey = config.evolutionApiKey && config.evolutionApiKey !== 'null' && config.evolutionApiKey.startsWith('***');
+          const hasZapiToken = config.zapiToken && config.zapiToken !== 'null' && config.zapiToken.startsWith('***');
+          
+          // Armazenar as chaves mascaradas para mostrar indicador
+          setSavedKeys({
+            openaiApiKey: hasOpenAIKey ? config.openaiApiKey : '',
+            evolutionApiKey: hasEvolutionKey ? config.evolutionApiKey : '',
+            zapiToken: hasZapiToken ? config.zapiToken : '',
+          });
+          
           setFormData({
-            // Para API keys, não mostrar o valor completo por segurança, mas manter indicador
-            // Se existe (não é null), manter string vazia para o usuário digitar novamente se quiser
-            // OU manter o valor se já estiver no localStorage (para não perder ao recarregar)
-            openaiApiKey: (config.openaiApiKey && config.openaiApiKey !== 'null') 
+            // Para API keys, mostrar valor do localStorage temporário se existir, senão string vazia
+            // O indicador visual será mostrado baseado em savedKeys
+            openaiApiKey: hasOpenAIKey 
               ? (localStorage.getItem('openai_api_key_temp') || '') 
               : '',
             n8nWebhookUrl: config.n8nWebhookUrl || '',
             evolutionApiUrl: config.evolutionApiUrl || '',
-            evolutionApiKey: (config.evolutionApiKey && config.evolutionApiKey !== 'null')
+            evolutionApiKey: hasEvolutionKey
               ? (localStorage.getItem('evolution_api_key_temp') || '')
               : '',
             evolutionInstance: config.evolutionInstance || '',
             zapiInstanceId: config.zapiInstanceId || '',
-            zapiToken: (config.zapiToken && config.zapiToken !== 'null')
+            zapiToken: hasZapiToken
               ? (localStorage.getItem('zapi_token_temp') || '')
               : '',
             zapiBaseUrl: config.zapiBaseUrl || 'https://api.z-api.io',
@@ -273,6 +286,21 @@ export function IntegrationsSettings() {
 
       console.log('Resposta do servidor:', response.data);
 
+      // Atualizar savedKeys com as chaves mascaradas retornadas pelo backend
+      if (response.data.config) {
+        const newSavedKeys = { ...savedKeys };
+        if (response.data.config.openaiApiKey && response.data.config.openaiApiKey.startsWith('***')) {
+          newSavedKeys.openaiApiKey = response.data.config.openaiApiKey;
+        }
+        if (response.data.config.evolutionApiKey && response.data.config.evolutionApiKey.startsWith('***')) {
+          newSavedKeys.evolutionApiKey = response.data.config.evolutionApiKey;
+        }
+        if (response.data.config.zapiToken && response.data.config.zapiToken.startsWith('***')) {
+          newSavedKeys.zapiToken = response.data.config.zapiToken;
+        }
+        setSavedKeys(newSavedKeys);
+      }
+
       // Também salvar no localStorage para referência (sem tokens completos por segurança)
       const safeFormData = {
         ...formData,
@@ -347,11 +375,18 @@ export function IntegrationsSettings() {
     setTestResults({ ...testResults, [type]: 'pending' });
 
     try {
-      if (type === 'openai' && formData.openaiApiKey) {
+      if (type === 'openai' && (formData.openaiApiKey || savedKeys.openaiApiKey)) {
+        // Buscar chave completa: primeiro do formData, senão do localStorage temporário
+        const apiKey = formData.openaiApiKey || localStorage.getItem('openai_api_key_temp') || '';
+        
+        if (!apiKey) {
+          throw new Error('Chave da OpenAI não encontrada. Digite a chave completa para testar.');
+        }
+        
         // Testar OpenAI
         const response = await fetch('https://api.openai.com/v1/models', {
           headers: {
-            'Authorization': `Bearer ${formData.openaiApiKey}`,
+            'Authorization': `Bearer ${apiKey}`,
           },
         });
         
@@ -479,7 +514,7 @@ export function IntegrationsSettings() {
                     Configure sua chave da OpenAI para habilitar análise inteligente de leads e respostas automáticas.
                   </CardDescription>
                 </div>
-                {testResults.openai === 'success' && (
+                {(savedKeys.openaiApiKey || testResults.openai === 'success') && (
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     <CheckCircle2 className="w-3 h-3 mr-1" />
                     Conectado
@@ -497,17 +532,29 @@ export function IntegrationsSettings() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="openai-api-key">API Key da OpenAI</Label>
-                  <Input
-                    id="openai-api-key"
-                    type="password"
-                    placeholder="sk-..."
-                    value={formData.openaiApiKey || ''}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      setFormData({ ...formData, openaiApiKey: newValue });
-                      handleAutoSave('openaiApiKey', newValue);
-                    }}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="openai-api-key"
+                      type="password"
+                      placeholder={savedKeys.openaiApiKey ? `Chave salva (${savedKeys.openaiApiKey})` : "sk-..."}
+                      value={formData.openaiApiKey || ''}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setFormData({ ...formData, openaiApiKey: newValue });
+                        handleAutoSave('openaiApiKey', newValue);
+                        // Limpar indicador de chave salva quando usuário começar a digitar
+                        if (newValue && savedKeys.openaiApiKey) {
+                          setSavedKeys({ ...savedKeys, openaiApiKey: '' });
+                        }
+                      }}
+                      className={savedKeys.openaiApiKey && !formData.openaiApiKey ? 'bg-green-50 border-green-300' : ''}
+                    />
+                    {savedKeys.openaiApiKey && !formData.openaiApiKey && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                      </div>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Obtenha sua API key em{' '}
                     <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
@@ -521,7 +568,7 @@ export function IntegrationsSettings() {
                     type="button"
                     variant="outline"
                     onClick={() => testConnection('openai')}
-                    disabled={!formData.openaiApiKey || isLoading}
+                    disabled={(!formData.openaiApiKey && !savedKeys.openaiApiKey) || isLoading}
                   >
                     Testar Conexão
                   </Button>
