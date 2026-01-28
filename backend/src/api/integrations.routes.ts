@@ -82,7 +82,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       // Não retornar API keys completas por segurança (apenas indicar se existe)
       return reply.send({
         openaiApiKey: config.openaiApiKey ? '***' + config.openaiApiKey.slice(-4) : null,
-        n8nWebhookUrl: config.n8nWebhookUrl || null,
         evolutionApiUrl: config.evolutionApiUrl || null,
         evolutionApiKey: config.evolutionApiKey ? '***' + config.evolutionApiKey.slice(-4) : null,
         evolutionInstance: config.evolutionInstance || null,
