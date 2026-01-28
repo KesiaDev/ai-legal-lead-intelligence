@@ -42,6 +42,19 @@ export function IntegrationsSettings() {
 
   // Função helper para auto-save de qualquer campo
   const handleAutoSave = (fieldName: keyof IntegrationConfig, value: string) => {
+    // Validar que usuário está autenticado antes de auto-save
+    if (!user) {
+      console.warn('Auto-save ignorado: usuário não autenticado');
+      return;
+    }
+
+    // Validar que token existe
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      console.warn('Auto-save ignorado: token não encontrado');
+      return;
+    }
+
     // Limpar timeout anterior
     if (autoSaveTimeout) {
       clearTimeout(autoSaveTimeout);
@@ -58,7 +71,7 @@ export function IntegrationsSettings() {
 
     // Auto-save após 2 segundos de inatividade
     const timeout = window.setTimeout(async () => {
-      if (value && value.trim().length > 0) {
+      if (value && value.trim().length > 0 && user && token) {
         try {
           const payload: any = {};
           payload[fieldName] = value.trim();
@@ -84,6 +97,13 @@ export function IntegrationsSettings() {
   useEffect(() => {
     // Só carregar se o usuário estiver autenticado
     if (!user) {
+      return;
+    }
+
+    // Validar que token existe antes de carregar
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      console.warn('Token não encontrado, não carregando configurações');
       return;
     }
 
@@ -155,6 +175,27 @@ export function IntegrationsSettings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar autenticação antes de submeter
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar autenticado para salvar configurações.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      toast({
+        title: 'Erro',
+        description: 'Token de autenticação não encontrado. Faça login novamente.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -194,22 +235,30 @@ export function IntegrationsSettings() {
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
+          const tokenPayload = JSON.parse(atob(token.split('.')[1]));
           console.log('🔑 Token antes de PATCH /api/integrations:', {
             hasToken: !!token,
-            tenantId: payload.tenantId,
-            userId: payload.id,
-            hasTenantId: !!payload.tenantId,
+            tenantId: tokenPayload.tenantId,
+            userId: tokenPayload.id,
+            hasTenantId: !!tokenPayload.tenantId,
           });
           
-          if (!payload.tenantId) {
+          if (!tokenPayload.tenantId) {
             console.error('❌ ERRO CRÍTICO: Token não contém tenantId!');
+            throw new Error('Token inválido: não contém tenantId');
           }
         } catch (e) {
           console.error('❌ ERRO ao validar token:', e);
+          throw new Error('Token inválido ou não encontrado');
         }
       } else {
         console.error('❌ ERRO: Nenhum token encontrado no localStorage!');
+        throw new Error('Não autenticado. Faça login novamente.');
+      }
+      
+      // Validar que usuário está autenticado
+      if (!user) {
+        throw new Error('Usuário não autenticado');
       }
       
       console.log('Enviando payload para salvar integrações:', {
@@ -285,6 +334,16 @@ export function IntegrationsSettings() {
 
 
   const testConnection = async (type: 'openai' | 'n8n' | 'evolution' | 'zapi') => {
+    // Validar autenticação antes de testar
+    if (!user) {
+      toast({
+        title: 'Erro',
+        description: 'Você precisa estar autenticado para testar conexões.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setTestResults({ ...testResults, [type]: 'pending' });
 
     try {
