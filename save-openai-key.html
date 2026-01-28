@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salvar Chave OpenAI</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            color: #007bff;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔑 Salvar Chave OpenAI</h1>
+        <p>Este script vai salvar a chave da OpenAI para o usuário <strong>kesiawnandi</strong>.</p>
+        
+        <button id="saveBtn" onclick="saveKey()">Salvar Chave da OpenAI</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function saveKey() {
+            const btn = document.getElementById('saveBtn');
+            const result = document.getElementById('result');
+            
+            // Desabilitar botão e mostrar loading
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+            result.style.display = 'block';
+            result.className = 'loading';
+            result.innerHTML = '⏳ Enviando requisição...';
+
+            try {
+                const response = await fetch('https://api.sdrjuridico.com.br/api/admin/save-openai-key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userIdentifier: 'kesiawnandi',
+                        openaiKey: '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',
+                        secret: 'admin-save-key-2026'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    result.className = 'success';
+                    result.innerHTML = `
+                        <h3>✅ Sucesso!</h3>
+                        <p><strong>Chave salva com sucesso!</strong></p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    result.className = 'error';
+                    result.innerHTML = `
+                        <h3>❌ Erro</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.className = 'error';
+                result.innerHTML = `
+                    <h3>❌ Erro de Conexão</h3>
+                    <p><strong>Erro:</strong> ${error.message}</p>
+                    <p>Verifique se o backend está rodando e acessível.</p>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Salvar Chave da OpenAI';
+            }
+        }
+    </script>
+</body>
+</html>
