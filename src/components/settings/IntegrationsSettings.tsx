@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface IntegrationConfig {
   openaiApiKey?: string;
-  n8nWebhookUrl?: string;
   evolutionApiUrl?: string;
   evolutionApiKey?: string;
   evolutionInstance?: string;
@@ -27,7 +26,6 @@ export function IntegrationsSettings() {
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<IntegrationConfig>({
     openaiApiKey: '',
-    n8nWebhookUrl: '',
     evolutionApiUrl: '',
     evolutionApiKey: '',
     evolutionInstance: '',
@@ -135,7 +133,6 @@ export function IntegrationsSettings() {
             openaiApiKey: hasOpenAIKey 
               ? (localStorage.getItem('openai_api_key_temp') || '') 
               : '',
-            n8nWebhookUrl: config.n8nWebhookUrl || '',
             evolutionApiUrl: config.evolutionApiUrl || '',
             evolutionApiKey: hasEvolutionKey
               ? (localStorage.getItem('evolution_api_key_temp') || '')
@@ -222,9 +219,6 @@ export function IntegrationsSettings() {
         payload.openaiApiKey = formData.openaiApiKey && formData.openaiApiKey.trim() !== '' ? formData.openaiApiKey : null;
       }
       
-      if (formData.n8nWebhookUrl !== undefined) {
-        payload.n8nWebhookUrl = formData.n8nWebhookUrl && formData.n8nWebhookUrl.trim() !== '' ? formData.n8nWebhookUrl : null;
-      }
       if (formData.evolutionApiUrl !== undefined) {
         payload.evolutionApiUrl = formData.evolutionApiUrl && formData.evolutionApiUrl.trim() !== '' ? formData.evolutionApiUrl : null;
       }
@@ -361,7 +355,7 @@ export function IntegrationsSettings() {
   };
 
 
-  const testConnection = async (type: 'openai' | 'n8n' | 'evolution' | 'zapi') => {
+  const testConnection = async (type: 'openai' | 'evolution' | 'zapi') => {
     // Validar autenticação antes de testar
     if (!user) {
       toast({
@@ -493,9 +487,8 @@ export function IntegrationsSettings() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="openai" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="openai">OpenAI</TabsTrigger>
-          <TabsTrigger value="n8n">N8N</TabsTrigger>
           <TabsTrigger value="evolution">Evolution API</TabsTrigger>
           <TabsTrigger value="zapi">Z-API</TabsTrigger>
         </TabsList>
@@ -588,88 +581,6 @@ export function IntegrationsSettings() {
                         <li>Classifica leads como quente, morno ou frio</li>
                         <li>Gera respostas inteligentes no chat</li>
                         <li>Se não configurar, usa análise básica (fallback)</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* N8N Integration */}
-        <TabsContent value="n8n" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Webhook className="w-5 h-5" />
-                    N8N Workflow
-                  </CardTitle>
-                  <CardDescription className="mt-2">
-                    Configure o webhook do seu workflow N8N para receber leads automaticamente.
-                  </CardDescription>
-                </div>
-                {testResults.n8n === 'success' && (
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    <CheckCircle2 className="w-3 h-3 mr-1" />
-                    Conectado
-                  </Badge>
-                )}
-                {testResults.n8n === 'error' && (
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                    <XCircle className="w-3 h-3 mr-1" />
-                    Erro
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="n8n-webhook">URL do Webhook N8N</Label>
-                  <Input
-                    id="n8n-webhook"
-                    type="url"
-                    placeholder="https://seu-n8n.com/webhook/..."
-                    value={formData.n8nWebhookUrl || ''}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      setFormData({ ...formData, n8nWebhookUrl: newValue });
-                      handleAutoSave('n8nWebhookUrl', newValue);
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    URL do webhook do seu workflow N8N que receberá os leads.
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => testConnection('n8n')}
-                    disabled={!formData.n8nWebhookUrl || isLoading}
-                  >
-                    Testar Conexão
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    <Save className="w-4 h-4 mr-2" />
-                    {isLoading ? 'Salvando...' : 'Salvar'}
-                  </Button>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex gap-2">
-                    <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
-                    <div className="text-sm text-blue-900">
-                      <p className="font-medium mb-1">Como funciona:</p>
-                      <ul className="list-disc list-inside space-y-1 text-blue-800">
-                        <li>Leads criados na plataforma são enviados para o N8N</li>
-                        <li>N8N processa e envia para WhatsApp via Evolution API</li>
-                        <li>Respostas do agente IA voltam para a plataforma</li>
-                        <li>Você pode ter múltiplos workflows N8N (um por cliente)</li>
                       </ul>
                     </div>
                   </div>
@@ -775,13 +686,12 @@ export function IntegrationsSettings() {
                   <div className="flex gap-2">
                     <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5" />
                     <div className="text-sm text-blue-900">
-                      <p className="font-medium mb-1">⚠️ Importante:</p>
+                      <p className="font-medium mb-1">Como funciona:</p>
                       <ul className="list-disc list-inside space-y-1 text-blue-800">
-                        <li><strong>Evolution API funciona no N8N, não aqui!</strong></li>
-                        <li>Esta tela é apenas para referência/documentação</li>
-                        <li>Configure a Evolution API diretamente no seu workflow N8N</li>
-                        <li>Se você usa Evolution compartilhada, não precisa preencher aqui</li>
-                        <li>Se cada cliente tem Evolution própria, eles te passam as credenciais e você configura no N8N</li>
+                        <li>Configure a Evolution API para envio e recebimento de mensagens via WhatsApp</li>
+                        <li>Cada cliente pode ter sua própria instância da Evolution API</li>
+                        <li>As credenciais são configuradas diretamente nesta plataforma</li>
+                        <li>A Evolution API permite integração completa com WhatsApp</li>
                       </ul>
                     </div>
                   </div>

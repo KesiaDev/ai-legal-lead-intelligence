@@ -141,7 +141,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
 
       const body = request.body as {
         openaiApiKey?: string;
-        n8nWebhookUrl?: string;
         evolutionApiUrl?: string;
         evolutionApiKey?: string;
         evolutionInstance?: string;
@@ -196,10 +195,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
       if (body.openaiApiKey !== undefined) {
         updateData.openaiApiKey = body.openaiApiKey === null || body.openaiApiKey === '' ? null : body.openaiApiKey;
         fastify.log.info({ tenantId, hasValue: !!updateData.openaiApiKey, length: updateData.openaiApiKey?.length || 0 }, 'OpenAI API Key será atualizada');
-      }
-      if (body.n8nWebhookUrl !== undefined) {
-        updateData.n8nWebhookUrl = body.n8nWebhookUrl === null || body.n8nWebhookUrl === '' ? null : body.n8nWebhookUrl;
-        fastify.log.info({ tenantId, hasValue: !!updateData.n8nWebhookUrl }, 'N8N Webhook URL será atualizada');
       }
       if (body.evolutionApiUrl !== undefined) {
         updateData.evolutionApiUrl = body.evolutionApiUrl === null || body.evolutionApiUrl === '' ? null : body.evolutionApiUrl;
@@ -332,7 +327,6 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
         // Não retornar API keys completas
         config: {
           openaiApiKey: config.openaiApiKey ? '***' + config.openaiApiKey.slice(-4) : null,
-          n8nWebhookUrl: config.n8nWebhookUrl,
           evolutionApiUrl: config.evolutionApiUrl,
           evolutionApiKey: config.evolutionApiKey ? '***' + config.evolutionApiKey.slice(-4) : null,
           evolutionInstance: config.evolutionInstance,
