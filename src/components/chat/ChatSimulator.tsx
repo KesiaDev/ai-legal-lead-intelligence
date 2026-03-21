@@ -262,13 +262,18 @@ export function ChatSimulator() {
             state,
             legalArea: lastAnalysis?.possibleLegalArea.key as LegalArea || mapAreaToKey(newLeadData.area || ''),
             demandDescription: newLeadData.demand,
-            urgency: lastAnalysis?.urgencyLevel || mapUrgencyToKey(newLeadData.urgency || ''),
-            status: (lastAnalysis?.urgencyLevel === 'alta' || newLeadData.urgency?.includes('Alta')) ? 'urgente' : 'qualificado',
+            urgency: mapUrgencyToKey(newLeadData.urgency || ''),
+            status: newLeadData.urgency?.includes('Alta') ? 'urgente' : 'qualificado',
             contactPreference: newLeadData.contactPreference,
             availableForHumanContact: newLeadData.wantsSchedule === 'true',
             lgpdConsent: true,
             lgpdConsentDate: new Date(),
-            messages: [],
+            messages: messages.map((m) => ({
+              id: m.id,
+              content: m.content,
+              sender: m.sender === 'user' ? 'lead' : 'sdr' as 'lead' | 'sdr',
+              timestamp: m.timestamp,
+            })),
             followUps: [],
           });
           setIsComplete(true);
