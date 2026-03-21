@@ -10,7 +10,9 @@ import {
   Scale,
   ChevronLeft,
   ChevronRight,
-  Bot
+  Bot,
+  Image,
+  ListChecks
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -22,9 +24,11 @@ const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'leads', label: 'Leads', icon: Users },
   { id: 'conversations', label: 'Conversas', icon: MessageSquare },
-  { id: 'schedule', label: 'Agendamentos', icon: Calendar },
+  { id: 'schedule', label: 'Agenda', icon: Calendar },
+  { id: 'media', label: 'Banco de Mídia', icon: Image },
   { id: 'export', label: 'Exportar Dados', icon: Download },
   { id: 'agent', label: 'Agente IA', icon: Bot },
+  { id: 'roadmap', label: 'O que falta', icon: ListChecks },
 ];
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {

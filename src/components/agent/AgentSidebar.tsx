@@ -11,7 +11,8 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
-  Mic
+  Mic,
+  Zap
 } from 'lucide-react';
 import { useState } from 'react';
 import { AgentSection } from '@/types/agent';
@@ -27,6 +28,7 @@ const agentSections = [
   { id: 'communication' as AgentSection, label: 'Comunicação', icon: MessageCircle },
   { id: 'humanization' as AgentSection, label: 'Humanização', icon: Sparkles },
   { id: 'voice' as AgentSection, label: 'Voz', icon: Mic },
+  { id: 'triggers' as AgentSection, label: 'Gatilhos', icon: Zap },
   { id: 'prompts' as AgentSection, label: 'Prompts', icon: FileText },
   { id: 'knowledge' as AgentSection, label: 'Base de Conhecimento', icon: BookOpen },
   { id: 'followup' as AgentSection, label: 'Follow-up', icon: RefreshCw },

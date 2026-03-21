@@ -7,8 +7,10 @@ import { DashboardView } from '@/components/views/DashboardView';
 import { LeadsView } from '@/components/views/LeadsView';
 import { ConversationsView } from '@/components/views/ConversationsView';
 import { ScheduleView } from '@/components/schedule/ScheduleView';
+import { MediaBankView } from '@/components/views/MediaBankView';
 import { ExportPanel } from '@/components/export/ExportPanel';
 import { AgentConfigView } from '@/components/views/AgentConfigView';
+import { MissingFeaturesView } from '@/components/views/MissingFeaturesView';
 import { SettingsView } from '@/components/settings/SettingsView';
 
 function AppContent() {
@@ -26,9 +28,11 @@ function AppContent() {
       case 'dashboard': return 'Dashboard';
       case 'leads': return 'Gestão de Leads';
       case 'conversations': return 'Conversas';
-      case 'schedule': return 'Agendamentos';
+      case 'schedule': return 'Agenda';
+      case 'media': return 'Banco de Mídia';
       case 'export': return 'Exportar Dados';
       case 'agent': return 'Configuração do Agente';
+      case 'roadmap': return 'O que falta';
       case 'settings': return 'Configurações';
       default: return 'SDR Jurídico';
     }
@@ -39,6 +43,8 @@ function AppContent() {
       case 'dashboard': return 'Visão geral do seu funil de leads';
       case 'leads': return `${leads.length} leads no sistema`;
       case 'conversations': return 'Simulador de atendimento';
+      case 'media': return 'Gerencie imagens, vídeos, áudios e documentos';
+      case 'roadmap': return 'O que o sistema ainda não tem';
       default: return undefined;
     }
   };
@@ -57,8 +63,10 @@ function AppContent() {
           {currentView === 'leads' && <LeadsView />}
           {currentView === 'conversations' && <ConversationsView />}
           {currentView === 'schedule' && <ScheduleView />}
+          {currentView === 'media' && <MediaBankView />}
           {currentView === 'export' && <ExportPanel />}
           {currentView === 'agent' && <AgentConfigView />}
+          {currentView === 'roadmap' && <MissingFeaturesView />}
           {currentView === 'settings' && <SettingsView />}
         </div>
       </main>

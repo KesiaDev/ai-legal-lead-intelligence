@@ -80,7 +80,7 @@ export interface Intention {
 
 export type AgentSection = 
   | 'config' 
-  | 'communication' 
+  | 'communication'
   | 'humanization'
   | 'voice'
   | 'prompts' 
@@ -88,4 +88,5 @@ export type AgentSection =
   | 'knowledge' 
   | 'followup' 
   | 'schedule' 
-  | 'intentions';
+  | 'intentions'
+  | 'triggers';

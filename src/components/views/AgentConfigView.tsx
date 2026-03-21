@@ -11,6 +11,7 @@ import { KnowledgeBaseSection } from '@/components/agent/sections/KnowledgeBaseS
 import { FollowUpSection } from '@/components/agent/sections/FollowUpSection';
 import { ScheduleConfigSection } from '@/components/agent/sections/ScheduleConfigSection';
 import { IntentionsSection } from '@/components/agent/sections/IntentionsSection';
+import { TriggersSection } from '@/components/agent/sections/TriggersSection';
 import { useAgent } from '@/contexts/AgentContext';
 
 export function AgentConfigView() {
@@ -39,6 +40,8 @@ export function AgentConfigView() {
         return <ScheduleConfigSection />;
       case 'intentions':
         return <IntentionsSection />;
+      case 'triggers':
+        return <TriggersSection />;
       default:
         return <AgentConfigSection />;
     }
