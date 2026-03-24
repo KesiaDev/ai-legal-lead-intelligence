@@ -45,6 +45,10 @@ model User {
   password String
   role     String  @default("user") // admin | user | sdr
   isActive Boolean @default(true)
+  isSystemAdmin Boolean @default(false)
+
+  passwordResetToken  String?   @unique
+  passwordResetExpiry DateTime?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -397,6 +401,9 @@ model IntegrationConfig {
 
   // N8N (opcional, para workflows externos)
   n8nWebhookUrl String?
+
+  // Apify (para raspagem de leads automática)
+  apifyApiKey String?
 
   // Evolution API (legado, pode ser removido)
   evolutionApiUrl    String?

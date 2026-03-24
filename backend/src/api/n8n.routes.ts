@@ -1,0 +1,222 @@
+/**
+ * Rotas de Integração N8N
+ *
+ * Webhook para receber leads do N8N (via Apify ou outras fontes)
+ * e endpoint para disparar runs do Apify via N8N
+ */
+
+import { FastifyInstance } from 'fastify';
+import { authenticate } from '../middleware/auth';
+import { apifyService } from '../services/apify.service';
+
+export async function registerN8NRoutes(fastify: FastifyInstance) {
+  /**
+   * Webhook público para N8N enviar leads importados
+   * N8N chama: POST /api/n8n/leads?token=<webhook_token>
+   *
+   * Aceita array de leads ou lead único
+   */
+  fastify.post('/api/n8n/leads', async (request: any, reply: any) => {
+    try {
+      const { token, tenantId } = request.query as { token?: string; tenantId?: string };
+
+      // Verificar token de webhook (simples, por tenantId)
+      if (!tenantId) {
+        return reply.status(400).send({ error: 'tenantId obrigatório na query string' });
+      }
+
+      // Verificar se tenant existe
+      const tenant = await fastify.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
+
+      if (!tenant) {
+        return reply.status(404).send({ error: 'Tenant não encontrado' });
+      }
+
+      const body = request.body as any;
+      const leadsRaw = Array.isArray(body) ? body : [body];
+
+      const created: string[] = [];
+      const errors: string[] = [];
+
+      for (const item of leadsRaw) {
+        try {
+          const name = item.nome || item.name || item.fullName || 'Lead sem nome';
+          const email = item.email || item.emailAddress || null;
+          const phone = item.telefone || item.phone || item.phoneNumber || '+55';
+          const legalArea = item.area || item.legalArea || null;
+          const demandDescription = item.descricao || item.description || item.summary || null;
+
+          const lead = await fastify.prisma.lead.create({
+            data: {
+              tenantId,
+              name,
+              email,
+              phone,
+              legalArea,
+              demandDescription,
+              status: 'novo',
+            },
+          });
+
+          created.push(lead.id);
+        } catch (itemError: any) {
+          errors.push(`${item.nome || item.name || 'sem nome'}: ${itemError.message}`);
+          fastify.log.error({ error: itemError.message, item }, 'Erro ao criar lead via N8N');
+        }
+      }
+
+      return reply.status(201).send({
+        success: true,
+        created: created.length,
+        errors: errors.length,
+        leadIds: created,
+        errorDetails: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro no webhook N8N');
+      return reply.status(500).send({ error: 'Erro interno', message: error.message });
+    }
+  });
+
+  /**
+   * Disparar um actor do Apify diretamente via API (sem N8N)
+   * Autenticado — apenas usuários logados podem disparar
+   */
+  fastify.post('/api/apify/run', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId = request.user?.tenantId;
+      if (!tenantId) {
+        return reply.status(401).send({ error: 'Tenant não identificado' });
+      }
+
+      const { actorId, input, waitForFinish = 60 } = request.body as {
+        actorId: string;
+        input: Record<string, any>;
+        waitForFinish?: number;
+      };
+
+      if (!actorId) {
+        return reply.status(400).send({ error: 'actorId é obrigatório' });
+      }
+
+      // Buscar API key do Apify salva para este tenant
+      const config = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
+
+      const apiKey = config?.apifyApiKey || process.env.APIFY_API_KEY;
+      if (!apiKey) {
+        return reply.status(400).send({
+          error: 'Apify API Key não configurada',
+          message: 'Configure a Apify API Key em Configurações > Integrações',
+        });
+      }
+
+      const run = await apifyService.runActor({
+        actorId,
+        apiKey,
+        input: input || {},
+        waitForFinish,
+      });
+
+      return reply.send({
+        success: true,
+        runId: run.runId,
+        datasetId: run.datasetId,
+        message: waitForFinish > 0
+          ? 'Actor iniciado. Aguardando resultados...'
+          : 'Actor iniciado em background. Use /api/apify/results/:datasetId para buscar resultados.',
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao disparar actor Apify');
+      return reply.status(500).send({ error: 'Erro ao executar Apify', message: error.message });
+    }
+  });
+
+  /**
+   * Buscar resultados de um dataset Apify e importar como leads
+   */
+  fastify.post('/api/apify/import/:datasetId', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId = request.user?.tenantId;
+      if (!tenantId) {
+        return reply.status(401).send({ error: 'Tenant não identificado' });
+      }
+
+      const { datasetId } = request.params as { datasetId: string };
+      const { area = 'Geral', fonte = 'apify' } = request.body as {
+        area?: string;
+        fonte?: string;
+      };
+
+      const config = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
+
+      const apiKey = config?.apifyApiKey || process.env.APIFY_API_KEY;
+      if (!apiKey) {
+        return reply.status(400).send({ error: 'Apify API Key não configurada' });
+      }
+
+      const items = await apifyService.getDatasetItems(datasetId, apiKey);
+      const created: string[] = [];
+
+      for (const item of items) {
+        const normalized = apifyService.normalizeToLead(item);
+        const lead = await fastify.prisma.lead.create({
+          data: {
+            tenantId,
+            name: normalized.nome,
+            email: normalized.email || null,
+            phone: normalized.telefone || '+55',
+            legalArea: area || null,
+            demandDescription: normalized.descricao || null,
+            status: 'novo',
+          },
+        });
+        created.push(lead.id);
+      }
+
+      return reply.send({
+        success: true,
+        imported: created.length,
+        leadIds: created,
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao importar leads do Apify');
+      return reply.status(500).send({ error: 'Erro ao importar', message: error.message });
+    }
+  });
+
+  /**
+   * Verificar status de um run do Apify
+   */
+  fastify.get('/api/apify/status/:runId', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId = request.user?.tenantId;
+      const { runId } = request.params as { runId: string };
+
+      const config = await fastify.prisma.integrationConfig.findUnique({
+        where: { tenantId },
+      });
+
+      const apiKey = config?.apifyApiKey || process.env.APIFY_API_KEY;
+      if (!apiKey) {
+        return reply.status(400).send({ error: 'Apify API Key não configurada' });
+      }
+
+      const status = await apifyService.getRunStatus(runId, apiKey);
+      return reply.send(status);
+    } catch (error: any) {
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+}

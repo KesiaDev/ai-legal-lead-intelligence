@@ -17,6 +17,10 @@ import { registerPromptsRoutes } from './api/prompts.routes';
 import { registerVoiceRoutes } from './api/voice.routes';
 import { registerIntegrationsRoutes } from './api/integrations.routes';
 import { registerAgentConfigRoutes } from './api/agent-config.routes';
+import { registerN8NRoutes } from './api/n8n.routes';
+import { registerAuthRoutes } from './api/auth.routes';
+import { registerAdminRoutes } from './api/admin.routes';
+import { checkLeadLimit, getPlanUsage, PlanLimitError } from './services/planLimits.service';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
@@ -536,6 +540,7 @@ async function build() {
   await registerVoiceRoutes(fastify);
   await registerIntegrationsRoutes(fastify);
   await registerAgentConfigRoutes(fastify);
+  await registerN8NRoutes(fastify);
 
   // ======================================================
   // PIPELINES E DEALS
