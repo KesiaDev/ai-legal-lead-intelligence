@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "prisma migrate deploy && prisma generate && tsx src/server.ts",
+    "start": "prisma db push --accept-data-loss && prisma generate && tsx src/server.ts",
     "start:direct": "tsx src/server.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
@@ -23,9 +23,11 @@
     "@fastify/jwt": "^7.2.4",
     "@fastify/websocket": "^8.3.1",
     "@prisma/client": "^5.19.1",
+    "@types/nodemailer": "^7.0.11",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "fastify": "^4.28.1",
+    "nodemailer": "^8.0.3",
     "openai": "^4.47.1",
     "tsx": "^4.19.1",
     "zod": "^3.23.8"
