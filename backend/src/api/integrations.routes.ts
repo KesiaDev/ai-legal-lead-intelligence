@@ -390,6 +390,231 @@ export async function registerIntegrationsRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Third-party integrations (ChatGuru, Pipedrive, Advbox, etc.)
+  // Persistidas no model UserIntegration do Prisma
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * POST /api/integrations/third-party
+   * Salva (ou atualiza) uma integração de terceiro para o usuário/tenant.
+   * Body: { type, provider, config }
+   */
+  fastify.post('/api/integrations/third-party', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId: string | undefined = request.user?.tenantId;
+      const userId: string | undefined = request.user?.id;
+
+      if (!tenantId || !userId) {
+        return reply.status(401).send({
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
+        });
+      }
+
+      const body = request.body as {
+        type: string;
+        provider: string;
+        config: Record<string, unknown>;
+      };
+
+      if (!body.type || !body.provider || !body.config) {
+        return reply.status(400).send({
+          error: 'Dados inválidos',
+          message: 'Os campos type, provider e config são obrigatórios',
+        });
+      }
+
+      const integration = await fastify.prisma.userIntegration.upsert({
+        where: {
+          userId_type_provider: {
+            userId,
+            type: body.type,
+            provider: body.provider,
+          },
+        },
+        update: {
+          config: body.config,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+        create: {
+          userId,
+          tenantId,
+          type: body.type,
+          provider: body.provider,
+          config: body.config,
+          isActive: true,
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        message: 'Integração salva com sucesso',
+        data: {
+          id: integration.id,
+          type: integration.type,
+          provider: integration.provider,
+          isActive: integration.isActive,
+          createdAt: integration.createdAt,
+          updatedAt: integration.updatedAt,
+        },
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao salvar integração de terceiro');
+      return reply.status(500).send({
+        error: 'Erro ao salvar integração',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
+  /**
+   * GET /api/integrations/third-party
+   * Lista todas as UserIntegration do tenant.
+   */
+  fastify.get('/api/integrations/third-party', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId: string | undefined = request.user?.tenantId;
+
+      if (!tenantId) {
+        return reply.status(401).send({
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
+        });
+      }
+
+      const integrations = await fastify.prisma.userIntegration.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          type: true,
+          provider: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          // config omitido intencionalmente — não expor credenciais na listagem
+        },
+      });
+
+      return reply.send({
+        success: true,
+        data: integrations,
+        total: integrations.length,
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao listar integrações de terceiro');
+      return reply.status(500).send({
+        error: 'Erro ao listar integrações',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/integrations/third-party/:id
+   * Remove uma integração pelo id.
+   */
+  fastify.delete('/api/integrations/third-party/:id', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId: string | undefined = request.user?.tenantId;
+
+      if (!tenantId) {
+        return reply.status(401).send({
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
+        });
+      }
+
+      const { id } = request.params as { id: string };
+
+      // Verificar se a integração pertence ao tenant antes de deletar
+      const existing = await fastify.prisma.userIntegration.findFirst({
+        where: { id, tenantId },
+      });
+
+      if (!existing) {
+        return reply.status(404).send({
+          error: 'Não encontrado',
+          message: 'Integração não encontrada ou não pertence a este tenant',
+        });
+      }
+
+      await fastify.prisma.userIntegration.delete({ where: { id } });
+
+      return reply.send({
+        success: true,
+        message: 'Integração removida com sucesso',
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao remover integração de terceiro');
+      return reply.status(500).send({
+        error: 'Erro ao remover integração',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
+  /**
+   * GET /api/integrations/third-party/:provider/config
+   * Retorna o config descriptografado de um provider específico do tenant.
+   */
+  fastify.get('/api/integrations/third-party/:provider/config', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const tenantId: string | undefined = request.user?.tenantId;
+
+      if (!tenantId) {
+        return reply.status(401).send({
+          error: 'Tenant não identificado',
+          message: 'Usuário não está associado a um tenant válido',
+        });
+      }
+
+      const { provider } = request.params as { provider: string };
+
+      const integration = await fastify.prisma.userIntegration.findFirst({
+        where: { tenantId, provider, isActive: true },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      if (!integration) {
+        return reply.status(404).send({
+          error: 'Não encontrado',
+          message: `Nenhuma integração ativa encontrada para o provider "${provider}" neste tenant`,
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          id: integration.id,
+          type: integration.type,
+          provider: integration.provider,
+          isActive: integration.isActive,
+          config: integration.config,
+          createdAt: integration.createdAt,
+          updatedAt: integration.updatedAt,
+        },
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao buscar config de integração de terceiro');
+      return reply.status(500).send({
+        error: 'Erro ao buscar config da integração',
+        message: error.message || 'Erro desconhecido',
+      });
+    }
+  });
+
   /**
    * Endpoint de verificação - retorna status dos tokens salvos (sem valores completos)
    */

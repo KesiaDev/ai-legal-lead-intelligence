@@ -491,6 +491,7 @@ model AgentConfig {
 model FollowUp {
   id          String    @id @default(uuid())
   tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   leadId      String
   lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   type        String    // message | call | email | whatsapp
@@ -520,6 +521,7 @@ model FollowUp {
 model Department {
   id          String             @id @default(uuid())
   tenantId    String
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   description String?
   color       String?
@@ -552,6 +554,7 @@ model UserIntegration {
   id        String   @id @default(uuid())
   userId    String
   tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type      String   // whatsapp | voice | calendar | crm
   provider  String   // chatguru | elevenlabs | google_calendar | outlook | pipedrive | rdstation | advbox | hubspot
   config    Json     // configurações específicas do provider
@@ -571,6 +574,7 @@ model UserIntegration {
 model MediaFile {
   id          String   @id @default(uuid())
   tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String
   type        String   // image | video | audio | document
   mimeType    String
