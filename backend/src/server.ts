@@ -13,6 +13,7 @@ import { registerPipelineRoutes } from './api/pipelines/routes';
 import { registerCrmRoutes } from './api/crm/routes';
 import { registerWhatsAppRoutes } from './api/whatsapp.routes';
 import { registerZApiRoutes } from './api/zapi.routes';
+import { registerEvolutionRoutes } from './api/evolution.routes';
 import { registerPromptsRoutes } from './api/prompts.routes';
 import { registerVoiceRoutes } from './api/voice.routes';
 import { registerIntegrationsRoutes } from './api/integrations.routes';
@@ -539,6 +540,7 @@ async function build() {
   await registerConversationRoute(fastify);
   await registerWhatsAppRoutes(fastify);
   await registerZApiRoutes(fastify);
+  await registerEvolutionRoutes(fastify);
   await registerPromptsRoutes(fastify);
   await registerVoiceRoutes(fastify);
   await registerIntegrationsRoutes(fastify);
