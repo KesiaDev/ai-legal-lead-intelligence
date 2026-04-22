@@ -219,4 +219,141 @@ export async function registerN8NRoutes(fastify: FastifyInstance) {
       return reply.status(500).send({ error: error.message });
     }
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════
+   * GET /api/n8n/agent-config
+   * ═══════════════════════════════════════════════════════
+   * Endpoint público para o N8N buscar TODA a configuração
+   * do agente em tempo real. Protegido por token estático.
+   *
+   * N8N chama no início de cada execução:
+   *   GET /api/n8n/agent-config?tenantId=xxx
+   *   Header: x-n8n-token: <N8N_SECRET do .env>
+   *
+   * Retorna config completa: prompt, humanização, intenções,
+   * base de conhecimento, agenda, follow-up, comunicação.
+   * ═══════════════════════════════════════════════════════
+   */
+  fastify.get('/api/n8n/agent-config', async (request: any, reply: any) => {
+    try {
+      const { tenantId } = request.query as { tenantId?: string };
+      const token = request.headers['x-n8n-token'];
+      const expected = process.env.N8N_SECRET || 'sdr-juridico-n8n-secret';
+
+      if (!tenantId) return reply.status(400).send({ error: 'tenantId obrigatório' });
+      if (token !== expected) return reply.status(401).send({ error: 'Token inválido' });
+
+      const prisma = fastify.prisma as any;
+
+      const [agentConfig, prompts, voiceConfig] = await Promise.all([
+        prisma.agentConfig.findUnique({ where: { tenantId } }),
+        prisma.agentPrompt.findMany({
+          where: { tenantId, status: 'ativo' },
+          select: { type: true, content: true, model: true, temperature: true, maxTokens: true },
+        }),
+        prisma.voiceConfig.findUnique({ where: { tenantId } }),
+      ]);
+
+      // Montar mapa de prompts por tipo
+      const promptMap: Record<string, any> = {};
+      for (const p of (prompts || [])) promptMap[p.type] = p;
+
+      // Prompt principal (orquestrador)
+      const systemPrompt = promptMap['orquestrador']?.content
+        || agentConfig?.templates?.find?.((t: any) => t.type === 'system')?.content
+        || 'Você é Sofia, assistente jurídica de IA. Seja empática, profissional e qualifique o lead com perguntas claras.';
+
+      return reply.send({
+        // Identidade do agente
+        name: agentConfig?.name || 'Sofia',
+        description: agentConfig?.description || '',
+        isActive: agentConfig?.isActive ?? true,
+
+        // Prompt principal para o AI node do N8N
+        systemPrompt,
+
+        // Todos os prompts disponíveis (qualificador, follow-up, etc.)
+        prompts: promptMap,
+
+        // Configuração de comunicação
+        // N8N usa: communicationConfig.bufferLatency → Wait node (ms)
+        //          communicationConfig.timeBetweenMessages → delay entre partes
+        communicationConfig: agentConfig?.communicationConfig || {
+          bufferLatency: 3000,
+          timeBetweenMessages: 1500,
+          errorMessage: 'Desculpe, tive um problema. Pode repetir?',
+        },
+
+        // Configuração de humanização
+        // N8N usa: humanizationConfig.typoRate, emojiFrequency, responseVariation
+        humanizationConfig: agentConfig?.humanizationConfig || {
+          typoRate: 0.05,
+          emojiFrequency: 'medium',
+          responseVariation: true,
+          splitMessages: true,
+          typingSpeed: 'medium',
+        },
+
+        // Base de conhecimento → injetada como contexto no AI node
+        // Array de { question: string, answer: string }
+        knowledgeBase: agentConfig?.knowledgeBase || [],
+
+        // Intenções → N8N usa para routing antes do AI
+        // Array de { keyword: string, action: string, response?: string }
+        intentions: agentConfig?.intentions || [],
+
+        // Follow-up config
+        followUpConfig: agentConfig?.followUpConfig || {
+          businessHours: { start: '09:00', end: '18:00', days: [1,2,3,4,5] },
+          cadence: [1, 3, 7],
+        },
+
+        // Agenda / Horário de atendimento
+        scheduleConfig: agentConfig?.scheduleConfig || {
+          timezone: 'America/Sao_Paulo',
+          slots: [],
+        },
+
+        // Templates de mensagem
+        templates: agentConfig?.templates || [],
+
+        // Funil de etapas
+        funnelStages: agentConfig?.funnelStages || [],
+
+        // Advogados / rotação
+        lawyers: agentConfig?.lawyers || [],
+        rotationRules: agentConfig?.rotationRules || {},
+
+        // Voz
+        voice: voiceConfig ? {
+          enabled: voiceConfig.enabled,
+          provider: voiceConfig.provider,
+          voiceId: voiceConfig.voiceId,
+          voiceName: voiceConfig.voiceName,
+          audioOnText: voiceConfig.audioResponseProbabilityOnText,
+          audioOnAudio: voiceConfig.audioResponseProbabilityOnAudio,
+        } : { enabled: false },
+
+        // Meta
+        _fetched_at: new Date().toISOString(),
+        _version: '2.0',
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao buscar agent config para N8N');
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+
+  /**
+   * POST /api/n8n/log
+   * N8N registra execuções para debug e auditoria
+   */
+  fastify.post('/api/n8n/log', async (request: any, reply: any) => {
+    const token = request.headers['x-n8n-token'];
+    const expected = process.env.N8N_SECRET || 'sdr-juridico-n8n-secret';
+    if (token !== expected) return reply.status(401).send({ error: 'Token inválido' });
+    fastify.log.info({ body: request.body }, 'N8N execution log');
+    return reply.send({ ok: true });
+  });
 }

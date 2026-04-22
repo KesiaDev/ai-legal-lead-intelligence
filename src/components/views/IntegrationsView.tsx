@@ -51,18 +51,19 @@ const INTEGRATIONS: Integration[] = [
     ],
   },
   {
-    id: 'zapi',
-    name: 'Z-API',
-    description: 'Conector WhatsApp não oficial. Altamente usado no Brasil para automação.',
+    id: 'evolution',
+    name: 'Evolution API',
+    description: 'WhatsApp open-source, auto-hospedado ou Evolution Go. Alta performance e sem limites.',
     icon: MessageSquare,
     color: 'text-emerald-600',
     category: 'whatsapp',
     connected: false,
     fields: [
-      { key: 'instanceId', label: 'ID da Instância', placeholder: 'xxxxxxxxxx' },
-      { key: 'instanceToken', label: 'Token da Instância', placeholder: 'xxxxxxxxxx' },
-      { key: 'clientToken', label: 'Client Token', placeholder: 'xxxxxxxxxx' },
+      { key: 'serverUrl', label: 'Server URL', placeholder: 'https://api.suaevo.com' },
+      { key: 'apiKey', label: 'API Key Global', placeholder: 'sua-api-key-evolution' },
+      { key: 'instanceName', label: 'Nome da Instância', placeholder: 'sdr-juridico' },
     ],
+    docsUrl: 'https://doc.evolution-api.com',
   },
   {
     id: 'rdstation',
@@ -257,7 +258,7 @@ export function IntegrationsView() {
             )}
             {integration.docsUrl && (
               <Button size="sm" variant="ghost" asChild>
-                <a href={integration.docsUrl} target="_blank" rel="noreferrer">
+                <a href={integration.docsUrl} target="_blank" rel="noreferrer" title="Ver documentação">
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </Button>
