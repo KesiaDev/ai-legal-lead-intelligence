@@ -20,6 +20,9 @@ import { registerAgentConfigRoutes } from './api/agent-config.routes';
 import { registerN8NRoutes } from './api/n8n.routes';
 import { registerAuthRoutes } from './api/auth.routes';
 import { registerAdminRoutes } from './api/admin.routes';
+import { followUpRoutes } from './api/followup.routes';
+import { reportsRoutes } from './api/reports.routes';
+import { departmentsRoutes } from './api/departments.routes';
 import { checkLeadLimit, getPlanUsage, PlanLimitError } from './services/planLimits.service';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
@@ -552,6 +555,20 @@ async function build() {
   // ======================================================
   await registerCrmRoutes(fastify);
 
+  // ======================================================
+  // FOLLOW-UPS
+  // ======================================================
+  await followUpRoutes(fastify);
+
+  // ======================================================
+  // RELATÓRIOS
+  // ======================================================
+  await reportsRoutes(fastify);
+
+  // ======================================================
+  // DEPARTAMENTOS
+  // ======================================================
+  await departmentsRoutes(fastify);
 
   // ======================================================
   // GERENCIAMENTO DE TENANTS (CLIENTES)

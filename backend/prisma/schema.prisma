@@ -30,6 +30,10 @@ model Tenant {
   voiceConfigs    VoiceConfig[]
   integrationConfig IntegrationConfig?
   agentConfig     AgentConfig?
+  followUps       FollowUp[]
+  departments     Department[]
+  userIntegrations UserIntegration[]
+  mediaFiles      MediaFile[]
 
   @@index([plan])
 }
@@ -101,6 +105,7 @@ model Lead {
   conversations   Conversation[]
   pipelineHistory PipelineHistory[]
   deals           Deal[]
+  followUps       FollowUp[]
 
   @@index([tenantId])
   @@index([status])
@@ -477,4 +482,107 @@ model AgentConfig {
 
   @@index([tenantId])
   @@index([isActive])
+}
+
+////////////////////
+// FOLLOW-UPS     //
+////////////////////
+
+model FollowUp {
+  id          String    @id @default(uuid())
+  tenantId    String
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type        String    // message | call | email | whatsapp
+  status      String    @default("pending") // pending | sent | failed | cancelled
+  scheduledAt DateTime
+  sentAt      DateTime?
+  content     String?   @db.Text
+  mediaUrl    String?
+  templateId  String?
+  notes       String?   @db.Text
+  cancelledBy String?   // userId or 'system'
+  cancelledAt DateTime?
+  createdBy   String    @default("ai") // ai | userId
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+////////////////////
+// DEPARTAMENTOS  //
+////////////////////
+
+model Department {
+  id          String             @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  color       String?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  members     DepartmentMember[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model DepartmentMember {
+  id           String     @id @default(uuid())
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  userId       String
+  role         String     @default("member") // manager | member
+  createdAt    DateTime   @default(now())
+
+  @@unique([departmentId, userId])
+  @@index([userId])
+}
+
+////////////////////
+// USER INTEGRATION//
+////////////////////
+
+model UserIntegration {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  type      String   // whatsapp | voice | calendar | crm
+  provider  String   // chatguru | elevenlabs | google_calendar | outlook | pipedrive | rdstation | advbox | hubspot
+  config    Json     // configurações específicas do provider
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type, provider])
+  @@index([userId])
+  @@index([tenantId])
+}
+
+////////////////////
+// MEDIA FILES    //
+////////////////////
+
+model MediaFile {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String
+  type        String   // image | video | audio | document
+  mimeType    String
+  url         String
+  size        Int      // bytes
+  duration    Int?     // segundos (para áudio/vídeo)
+  usageCount  Int      @default(0)
+  tags        Json?    // array de tags
+  uploadedBy  String   // userId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([type])
 }

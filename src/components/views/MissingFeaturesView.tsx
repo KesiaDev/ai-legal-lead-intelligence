@@ -30,22 +30,22 @@ const features: FeatureItem[] = [
   { id: 'trigger-3', title: 'Gatilhos por intenção', description: 'Regras baseadas em intenções detectadas pela IA', status: 'missing', category: 'Gatilhos' },
   
   // Agenda / Follow-up
-  { id: 'agenda-1', title: 'Follow-ups por contato', description: 'Tabela de follow-ups com status (pendentes, enviados, falhas)', status: 'missing', category: 'Agenda' },
+  { id: 'agenda-1', title: 'Follow-ups por contato', description: 'Tabela de follow-ups com status (pendentes, enviados, falhas)', status: 'implemented', category: 'Agenda' },
   { id: 'agenda-2', title: 'Cadência de mensagens', description: 'Intervalos configuráveis entre follow-ups', status: 'partial', category: 'Agenda' },
   { id: 'agenda-3', title: 'Lembretes dinâmicos (Prompt)', description: 'Lembretes gerados por IA com variáveis', status: 'partial', category: 'Agenda' },
-  { id: 'agenda-4', title: 'Lembretes agendados por contato', description: 'Visualizar histórico de lembretes por lead', status: 'missing', category: 'Agenda' },
-  { id: 'agenda-5', title: 'Cancelar follow-ups em massa', description: 'Ação para cancelar todos os follow-ups pendentes', status: 'missing', category: 'Agenda' },
-  
+  { id: 'agenda-4', title: 'Lembretes agendados por contato', description: 'Visualizar histórico de lembretes por lead', status: 'implemented', category: 'Agenda' },
+  { id: 'agenda-5', title: 'Cancelar follow-ups em massa', description: 'Ação para cancelar todos os follow-ups pendentes', status: 'implemented', category: 'Agenda' },
+
   // Usuários e Departamentos
-  { id: 'user-1', title: 'Departamentos', description: 'Organização de usuários em departamentos', status: 'missing', category: 'Usuários' },
-  { id: 'user-2', title: 'Integração WhatsApp por usuário', description: 'Vincular ChatGuru/WhatsApp individual a cada operador', status: 'missing', category: 'Usuários' },
-  { id: 'user-3', title: 'Integração Voz por usuário', description: 'Voz ElevenLabs configurada por operador', status: 'missing', category: 'Usuários' },
-  { id: 'user-4', title: 'Integração Calendário por usuário', description: 'Google Calendar ou Calendário vinculado por usuário', status: 'missing', category: 'Usuários' },
-  { id: 'user-5', title: 'Integração CRM por usuário', description: 'Pipedrive, HubSpot etc. por operador', status: 'missing', category: 'Usuários' },
-  
+  { id: 'user-1', title: 'Departamentos', description: 'Organização de usuários em departamentos', status: 'implemented', category: 'Usuários' },
+  { id: 'user-2', title: 'Integração WhatsApp por usuário', description: 'ChatGuru e Z-API configuráveis por operador', status: 'implemented', category: 'Usuários' },
+  { id: 'user-3', title: 'Integração Voz por usuário', description: 'Voz ElevenLabs configurada por operador', status: 'partial', category: 'Usuários' },
+  { id: 'user-4', title: 'Integração Calendário por usuário', description: 'Google Calendar e Outlook vinculados por usuário', status: 'implemented', category: 'Usuários' },
+  { id: 'user-5', title: 'Integração CRM por usuário', description: 'Pipedrive, HubSpot, RD Station, Advbox por operador', status: 'implemented', category: 'Usuários' },
+
   // Canais e Integrações
   { id: 'channel-1', title: 'Multi-canal unificado', description: 'Central de Atendimento + API Oficial no mesmo painel', status: 'partial', category: 'Canais' },
-  { id: 'channel-2', title: 'Relatórios de conversas', description: 'Métricas detalhadas por canal e período', status: 'missing', category: 'Canais' },
+  { id: 'channel-2', title: 'Relatórios de conversas', description: 'Métricas detalhadas por canal e período', status: 'implemented', category: 'Canais' },
 ];
 
 const categoryIcons: Record<string, React.ReactNode> = {

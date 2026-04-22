@@ -11,6 +11,10 @@ import { MediaBankView } from '@/components/views/MediaBankView';
 import { ExportPanel } from '@/components/export/ExportPanel';
 import { AgentConfigView } from '@/components/views/AgentConfigView';
 import { MissingFeaturesView } from '@/components/views/MissingFeaturesView';
+import { FollowUpView } from '@/components/views/FollowUpView';
+import { ReportsView } from '@/components/views/ReportsView';
+import { DepartmentsView } from '@/components/views/DepartmentsView';
+import { IntegrationsView } from '@/components/views/IntegrationsView';
 import { SettingsView } from '@/components/settings/SettingsView';
 
 function AppContent() {
@@ -30,6 +34,10 @@ function AppContent() {
       case 'conversations': return 'Conversas';
       case 'schedule': return 'Agenda';
       case 'media': return 'Banco de Mídia';
+      case 'followups': return 'Follow-ups';
+      case 'reports': return 'Relatórios';
+      case 'departments': return 'Departamentos';
+      case 'integrations': return 'Integrações';
       case 'export': return 'Exportar Dados';
       case 'agent': return 'Configuração do Agente';
       case 'roadmap': return 'O que falta';
@@ -44,6 +52,10 @@ function AppContent() {
       case 'leads': return `${leads.length} leads no sistema`;
       case 'conversations': return 'Simulador de atendimento';
       case 'media': return 'Gerencie imagens, vídeos, áudios e documentos';
+      case 'followups': return 'Lembretes e acompanhamentos agendados';
+      case 'reports': return 'Métricas detalhadas do seu SDR Jurídico';
+      case 'departments': return 'Organize sua equipe por área de atuação';
+      case 'integrations': return 'Conecte WhatsApp, CRM, Calendário e sistemas jurídicos';
       case 'roadmap': return 'O que o sistema ainda não tem';
       default: return undefined;
     }
@@ -65,6 +77,10 @@ function AppContent() {
           {currentView === 'schedule' && <ScheduleView />}
           {currentView === 'media' && <MediaBankView />}
           {currentView === 'export' && <ExportPanel />}
+          {currentView === 'followups' && <FollowUpView />}
+          {currentView === 'reports' && <ReportsView />}
+          {currentView === 'departments' && <DepartmentsView />}
+          {currentView === 'integrations' && <IntegrationsView />}
           {currentView === 'agent' && <AgentConfigView />}
           {currentView === 'roadmap' && <MissingFeaturesView />}
           {currentView === 'settings' && <SettingsView />}

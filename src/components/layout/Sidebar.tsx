@@ -1,18 +1,22 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, 
-  Users, 
-  MessageSquare, 
-  Calendar, 
-  Download, 
+import {
+  LayoutDashboard,
+  Users,
+  MessageSquare,
+  Calendar,
+  Download,
   Settings,
   Scale,
   ChevronLeft,
   ChevronRight,
   Bot,
   Image,
-  ListChecks
+  ListChecks,
+  Bell,
+  BarChart2,
+  Building2,
+  Plug,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,7 +29,11 @@ const navItems = [
   { id: 'leads', label: 'Leads', icon: Users },
   { id: 'conversations', label: 'Conversas', icon: MessageSquare },
   { id: 'schedule', label: 'Agenda', icon: Calendar },
+  { id: 'followups', label: 'Follow-ups', icon: Bell },
+  { id: 'reports', label: 'Relatórios', icon: BarChart2 },
   { id: 'media', label: 'Banco de Mídia', icon: Image },
+  { id: 'departments', label: 'Departamentos', icon: Building2 },
+  { id: 'integrations', label: 'Integrações', icon: Plug },
   { id: 'export', label: 'Exportar Dados', icon: Download },
   { id: 'agent', label: 'Agente IA', icon: Bot },
   { id: 'roadmap', label: 'O que falta', icon: ListChecks },
