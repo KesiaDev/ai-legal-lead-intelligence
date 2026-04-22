@@ -30,7 +30,7 @@ import {
   RefreshCw,
   Download,
 } from 'lucide-react';
-import { apiClient } from '@/api/client';
+import api from '@/api/client';
 
 const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
 
@@ -129,9 +129,9 @@ export function ReportsView() {
       ).toISOString();
 
       const [summaryRes, leadsRes, convsRes] = await Promise.all([
-        apiClient.get('/api/reports/summary'),
-        apiClient.get('/api/reports/leads', { params: { from, to } }),
-        apiClient.get('/api/reports/conversations', { params: { from, to } }),
+        api.get('/api/reports/summary'),
+        api.get('/api/reports/leads', { params: { from, to } }),
+        api.get('/api/reports/conversations', { params: { from, to } }),
       ]);
       setData({ summary: summaryRes.data, leads: leadsRes.data, conversations: convsRes.data });
     } catch {

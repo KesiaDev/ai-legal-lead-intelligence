@@ -33,7 +33,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient } from '@/api/client';
+import api from '@/api/client';
 
 interface FollowUp {
   id: string;
@@ -79,10 +79,10 @@ export function FollowUpView() {
     setLoading(true);
     try {
       const [fuRes, statsRes] = await Promise.all([
-        apiClient.get('/api/followups', {
+        api.get('/api/followups', {
           params: statusFilter !== 'all' ? { status: statusFilter } : {},
         }),
-        apiClient.get('/api/followups/stats'),
+        api.get('/api/followups/stats'),
       ]);
       setFollowUps(fuRes.data);
       setStats(statsRes.data);
@@ -97,7 +97,7 @@ export function FollowUpView() {
 
   async function handleCancel(id: string) {
     try {
-      await apiClient.delete(`/api/followups/${id}`);
+      await api.delete(`/api/followups/${id}`);
       toast({ title: 'Follow-up cancelado' });
       loadData();
     } catch {
@@ -107,7 +107,7 @@ export function FollowUpView() {
 
   async function handleBulkCancel() {
     try {
-      const res = await apiClient.post('/api/followups/bulk-cancel', {});
+      const res = await api.post('/api/followups/bulk-cancel', {});
       toast({ title: `${res.data.cancelled} follow-ups cancelados` });
       loadData();
     } catch {

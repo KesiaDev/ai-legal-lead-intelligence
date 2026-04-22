@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Users, Pencil, Trash2, RefreshCw, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { apiClient } from '@/api/client';
+import api from '@/api/client';
 
 interface Department {
   id: string;
@@ -75,7 +75,7 @@ export function DepartmentsView() {
   async function loadData() {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/departments');
+      const res = await api.get('/api/departments');
       setDepartments(res.data);
     } catch {
       setDepartments(MOCK_DEPARTMENTS);
@@ -102,10 +102,10 @@ export function DepartmentsView() {
     if (!formName.trim()) return;
     try {
       if (editTarget) {
-        await apiClient.put(`/api/departments/${editTarget.id}`, { name: formName, color: formColor });
+        await api.put(`/api/departments/${editTarget.id}`, { name: formName, color: formColor });
         toast({ title: 'Departamento atualizado' });
       } else {
-        await apiClient.post('/api/departments', { name: formName, color: formColor });
+        await api.post('/api/departments', { name: formName, color: formColor });
         toast({ title: 'Departamento criado' });
       }
       setShowCreate(false);
@@ -117,7 +117,7 @@ export function DepartmentsView() {
 
   async function handleDelete(id: string) {
     try {
-      await apiClient.delete(`/api/departments/${id}`);
+      await api.delete(`/api/departments/${id}`);
       toast({ title: 'Departamento removido' });
       loadData();
     } catch {
@@ -127,7 +127,7 @@ export function DepartmentsView() {
 
   async function handleToggleActive(dept: Department) {
     try {
-      await apiClient.patch(`/api/departments/${dept.id}/toggle`);
+      await api.patch(`/api/departments/${dept.id}/toggle`);
       loadData();
     } catch {
       setDepartments(prev =>
