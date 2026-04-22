@@ -10,7 +10,6 @@ import { ScheduleView } from '@/components/schedule/ScheduleView';
 import { MediaBankView } from '@/components/views/MediaBankView';
 import { ExportPanel } from '@/components/export/ExportPanel';
 import { AgentConfigView } from '@/components/views/AgentConfigView';
-import { MissingFeaturesView } from '@/components/views/MissingFeaturesView';
 import { FollowUpView } from '@/components/views/FollowUpView';
 import { ReportsView } from '@/components/views/ReportsView';
 import { DepartmentsView } from '@/components/views/DepartmentsView';
@@ -40,7 +39,6 @@ function AppContent() {
       case 'integrations': return 'Integrações';
       case 'export': return 'Exportar Dados';
       case 'agent': return 'Configuração do Agente';
-      case 'roadmap': return 'O que falta';
       case 'settings': return 'Configurações';
       default: return 'SDR Jurídico';
     }
@@ -56,7 +54,6 @@ function AppContent() {
       case 'reports': return 'Métricas detalhadas do seu SDR Jurídico';
       case 'departments': return 'Organize sua equipe por área de atuação';
       case 'integrations': return 'Conecte WhatsApp, CRM, Calendário e sistemas jurídicos';
-      case 'roadmap': return 'O que o sistema ainda não tem';
       default: return undefined;
     }
   };
@@ -82,7 +79,6 @@ function AppContent() {
           {currentView === 'departments' && <DepartmentsView />}
           {currentView === 'integrations' && <IntegrationsView />}
           {currentView === 'agent' && <AgentConfigView />}
-          {currentView === 'roadmap' && <MissingFeaturesView />}
           {currentView === 'settings' && <SettingsView />}
         </div>
       </main>

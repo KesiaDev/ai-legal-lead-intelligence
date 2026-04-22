@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Bot,
   Image,
-  ListChecks,
   Bell,
   BarChart2,
   Building2,
@@ -36,7 +35,6 @@ const navItems = [
   { id: 'integrations', label: 'Integrações', icon: Plug },
   { id: 'export', label: 'Exportar Dados', icon: Download },
   { id: 'agent', label: 'Agente IA', icon: Bot },
-  { id: 'roadmap', label: 'O que falta', icon: ListChecks },
 ];
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
