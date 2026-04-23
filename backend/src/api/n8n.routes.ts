@@ -356,4 +356,169 @@ export async function registerN8NRoutes(fastify: FastifyInstance) {
     fastify.log.info({ body: request.body }, 'N8N execution log');
     return reply.send({ ok: true });
   });
+
+  /**
+   * ═══════════════════════════════════════════════════════
+   * GET /api/n8n/conversation-history
+   * ═══════════════════════════════════════════════════════
+   * N8N busca histórico da conversa por telefone ANTES de chamar a IA
+   * para fornecer memória completa ao modelo.
+   *
+   * GET /api/n8n/conversation-history?tenantId=xxx&phone=5511999999999&limit=30
+   * Header: x-n8n-token: <N8N_SECRET>
+   *
+   * Retorna:
+   *  - messages: [{role: 'user'|'assistant', content: string}]
+   *  - lead: dados do lead se encontrado
+   *  - totalMessages: total histórico
+   * ═══════════════════════════════════════════════════════
+   */
+  fastify.get('/api/n8n/conversation-history', async (request: any, reply: any) => {
+    try {
+      const { tenantId, phone, limit = '30' } = request.query as {
+        tenantId?: string;
+        phone?: string;
+        limit?: string;
+      };
+      const token = request.headers['x-n8n-token'];
+      const expected = process.env.N8N_SECRET || 'sdr-juridico-n8n-secret';
+
+      if (!tenantId) return reply.status(400).send({ error: 'tenantId obrigatório' });
+      if (!phone) return reply.status(400).send({ error: 'phone obrigatório' });
+      if (token !== expected) return reply.status(401).send({ error: 'Token inválido' });
+
+      const prisma = fastify.prisma as any;
+
+      // Normalizar telefone
+      const digits = phone.replace(/\D/g, '');
+      const normalizedPhone = digits.startsWith('55') ? digits : `55${digits}`;
+
+      // Buscar lead
+      const lead = await prisma.lead.findFirst({
+        where: { tenantId, phone: normalizedPhone },
+        select: { id: true, name: true, phone: true, email: true, status: true, legalArea: true, demandDescription: true },
+      });
+
+      if (!lead) {
+        return reply.send({
+          messages: [],
+          lead: null,
+          totalMessages: 0,
+          isNewLead: true,
+        });
+      }
+
+      // Buscar conversa ativa mais recente
+      const conversation = await prisma.conversation.findFirst({
+        where: { leadId: lead.id, tenantId, status: 'active' },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: parseInt(limit),
+            where: { senderType: { in: ['lead', 'ai', 'sdr'] } },
+          },
+        },
+      });
+
+      if (!conversation) {
+        return reply.send({
+          messages: [],
+          lead,
+          totalMessages: 0,
+          isNewLead: false,
+          assignedType: 'ai',
+        });
+      }
+
+      // Formatar mensagens para o N8N/IA
+      const messages = conversation.messages.map((msg: any) => ({
+        role: msg.senderType === 'lead' ? 'user' : 'assistant',
+        content: msg.content,
+        timestamp: msg.createdAt,
+      }));
+
+      return reply.send({
+        messages,
+        lead,
+        totalMessages: messages.length,
+        isNewLead: false,
+        conversationId: conversation.id,
+        assignedType: conversation.assignedType,
+        conversationStatus: conversation.status,
+      });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao buscar histórico para N8N');
+      return reply.status(500).send({ error: error.message });
+    }
+  });
+
+  /**
+   * ═══════════════════════════════════════════════════════
+   * POST /api/n8n/save-message
+   * ═══════════════════════════════════════════════════════
+   * N8N salva mensagens no banco após processar com IA.
+   * Garante que o histórico da plataforma fica sincronizado com o N8N.
+   *
+   * Body: { tenantId, phone, messages: [{role, content}], leadName? }
+   * ═══════════════════════════════════════════════════════
+   */
+  fastify.post('/api/n8n/save-message', async (request: any, reply: any) => {
+    try {
+      const token = request.headers['x-n8n-token'];
+      const expected = process.env.N8N_SECRET || 'sdr-juridico-n8n-secret';
+      if (token !== expected) return reply.status(401).send({ error: 'Token inválido' });
+
+      const { tenantId, phone, messages, leadName } = request.body as {
+        tenantId: string;
+        phone: string;
+        messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+        leadName?: string;
+      };
+
+      if (!tenantId || !phone || !messages?.length) {
+        return reply.status(400).send({ error: 'tenantId, phone e messages são obrigatórios' });
+      }
+
+      const prisma = fastify.prisma as any;
+      const digits = phone.replace(/\D/g, '');
+      const normalizedPhone = digits.startsWith('55') ? digits : `55${digits}`;
+
+      // Upsert lead
+      let lead = await prisma.lead.findFirst({ where: { tenantId, phone: normalizedPhone } });
+      if (!lead) {
+        lead = await prisma.lead.create({
+          data: { tenantId, name: leadName || normalizedPhone, phone: normalizedPhone, status: 'novo' },
+        });
+      }
+
+      // Upsert conversa
+      let conversation = await prisma.conversation.findFirst({
+        where: { leadId: lead.id, channel: 'whatsapp', status: 'active' },
+      });
+      if (!conversation) {
+        conversation = await prisma.conversation.create({
+          data: { leadId: lead.id, tenantId, channel: 'whatsapp', status: 'active', assignedType: 'ai' },
+        });
+      }
+
+      // Salvar mensagens novas
+      for (const msg of messages) {
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            content: msg.content,
+            senderType: msg.role === 'user' ? 'lead' : 'ai',
+          },
+        });
+      }
+
+      await prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
+
+      return reply.send({ ok: true, leadId: lead.id, conversationId: conversation.id });
+    } catch (error: any) {
+      fastify.log.error({ error }, 'Erro ao salvar mensagens do N8N');
+      return reply.status(500).send({ error: error.message });
+    }
+  });
 }

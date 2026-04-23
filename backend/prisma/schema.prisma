@@ -405,6 +405,9 @@ model IntegrationConfig {
   // OpenAI
   openaiApiKey String? // API Key da OpenAI (criptografada)
 
+  // Anthropic Claude (prioritário quando configurado)
+  anthropicApiKey String?
+
   // N8N (opcional, para workflows externos)
   n8nWebhookUrl String?
 

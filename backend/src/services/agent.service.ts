@@ -1,11 +1,19 @@
 /**
- * Serviço de Agente IA
- * 
- * Este serviço gerencia conversas com agentes IA usando os prompts da plataforma.
- * Integra com OpenAI para gerar respostas seguindo as regras e prompts configurados.
+ * Serviço de Agente IA — Super SDR Jurídico
+ *
+ * Suporta:
+ *  - Anthropic Claude (claude-sonnet-4-6 / claude-opus-4-7) — PRIORITÁRIO
+ *  - OpenAI GPT-4o / gpt-4o-mini — FALLBACK
+ *
+ * Fluxo:
+ *  1. Busca histórico de conversa do banco (últimas 30 mensagens)
+ *  2. Busca chave API (Anthropic > OpenAI) e prompt do tenant
+ *  3. Chama IA com histórico + mensagem atual
+ *  4. Retorna resposta estruturada
  */
 
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { PromptService } from './prompt.service';
@@ -25,12 +33,18 @@ interface AgentResponse {
     urgencyDetected?: string;
     legalAreaSuggested?: string;
     requiresHumanReview?: boolean;
+    sendImage?: { url: string; caption: string } | null;
   };
   conversationData: any;
 }
 
+interface ApiKeys {
+  anthropicApiKey: string | null;
+  openaiApiKey: string | null;
+  preferredProvider: 'anthropic' | 'openai' | null;
+}
+
 export class AgentService {
-  private openai: OpenAI | null;
   private fastify: FastifyInstance;
   private prisma: PrismaClient;
   private promptService: PromptService;
@@ -39,160 +53,161 @@ export class AgentService {
     this.fastify = fastify;
     this.prisma = fastify.prisma as PrismaClient;
     this.promptService = new PromptService(fastify);
-
-    // Inicializar OpenAI se API key estiver configurada
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-      this.fastify.log.info('OpenAI configurado para agente IA');
-    } else {
-      this.openai = null;
-      this.fastify.log.warn('OpenAI não configurado. Agente IA usará fallback.');
-    }
   }
 
-  /**
-   * Processa conversa com agente IA
-   */
   async processConversation(request: ConversationRequest): Promise<AgentResponse> {
     try {
-      // Recuperar histórico de conversa do banco
-      const conversationHistory = await this.getConversationHistory(request.lead_id);
+      const history = await this.getConversationHistory(request.lead_id);
+      const keys = await this.getApiKeys(request.lead_id, request.clienteId);
 
-      // Verificar se OpenAI está disponível (env ou banco)
-      const apiKey = await this.getOpenAIApiKey(request.lead_id, request.clienteId);
-      const hasOpenAI = !!apiKey;
-
-      // Se OpenAI estiver configurado, usar IA
-      if (hasOpenAI) {
-        return await this.processWithOpenAI(request, conversationHistory);
-      } else {
-        // Fallback para lógica básica
-        this.fastify.log.debug('OpenAI não disponível, usando fallback');
-        return await this.processWithFallback(request, conversationHistory);
+      if (keys.preferredProvider === 'anthropic' && keys.anthropicApiKey) {
+        return await this.processWithAnthropic(request, history, keys.anthropicApiKey);
       }
+
+      if (keys.openaiApiKey) {
+        return await this.processWithOpenAI(request, history, keys.openaiApiKey);
+      }
+
+      this.fastify.log.warn({ leadId: request.lead_id }, 'Nenhuma API key configurada, usando fallback');
+      return await this.processWithFallback(request, history);
     } catch (error: any) {
-      this.fastify.log.error({ error }, 'Erro ao processar conversa com agente');
-      // Em caso de erro, tenta fallback
+      this.fastify.log.error({ error: error.message }, 'Erro no agente IA, usando fallback');
       try {
-        const conversationHistory = await this.getConversationHistory(request.lead_id);
-        return await this.processWithFallback(request, conversationHistory);
-      } catch (fallbackError) {
-        throw error; // Se fallback também falhar, lança erro original
+        const history = await this.getConversationHistory(request.lead_id);
+        return await this.processWithFallback(request, history);
+      } catch {
+        throw error;
       }
     }
   }
 
-  /**
-   * Obtém API key da OpenAI (banco por tenant PRIMEIRO, depois variável de ambiente como fallback)
-   * IMPORTANTE: Prioriza banco sobre env var para permitir configuração por tenant
-   */
-  private async getOpenAIApiKey(leadId?: string, clienteId?: string): Promise<string | null> {
-    // Tentar obter tenantId do lead ou clienteId
+  // ─── API Keys ─────────────────────────────────────────────────────────────
+
+  private async getApiKeys(leadId?: string, clienteId?: string): Promise<ApiKeys> {
     let tenantId: string | undefined = clienteId;
 
-    // Se não tiver tenantId mas tiver leadId, buscar do lead
     if (!tenantId && leadId) {
       try {
-        const lead = await this.prisma.lead.findUnique({
-          where: { id: leadId },
-          select: { tenantId: true },
-        });
-        if (lead) {
-          tenantId = lead.tenantId;
-        }
-      } catch (error) {
-        this.fastify.log.warn({ error, leadId }, 'Erro ao buscar tenantId do lead');
-      }
+        const lead = await this.prisma.lead.findUnique({ where: { id: leadId }, select: { tenantId: true } });
+        if (lead) tenantId = lead.tenantId;
+      } catch {}
     }
 
-    // PRIORIDADE 1: Buscar no banco por tenant (permite configuração por cliente)
+    let anthropicApiKey: string | null = null;
+    let openaiApiKey: string | null = null;
+
     if (tenantId) {
       try {
-        const config = await this.prisma.integrationConfig.findUnique({
+        const config = await (this.prisma as any).integrationConfig.findUnique({
           where: { tenantId },
-          select: { openaiApiKey: true },
+          select: { anthropicApiKey: true, openaiApiKey: true },
         });
 
-        if (config?.openaiApiKey && config.openaiApiKey.trim() !== '' && config.openaiApiKey !== 'null') {
-          this.fastify.log.info({ tenantId }, 'OpenAI API key encontrada no banco (por tenant)');
-          return config.openaiApiKey;
-        }
-      } catch (error: any) {
-        // Se erro for "tabela não existe", logar mas continuar para fallback
-        if (error.message?.includes('does not exist') || error.code === 'P2021') {
-          this.fastify.log.warn({ tenantId, error: error.message }, 'Tabela IntegrationConfig não existe ainda - usando fallback');
-        } else {
-          this.fastify.log.warn({ error, tenantId }, 'Erro ao buscar OpenAI API key do banco');
-        }
+        if (config?.anthropicApiKey?.trim()) anthropicApiKey = config.anthropicApiKey;
+        if (config?.openaiApiKey?.trim()) openaiApiKey = config.openaiApiKey;
+      } catch (err: any) {
+        this.fastify.log.warn({ err: err.message, tenantId }, 'Erro ao buscar API keys do banco');
       }
     }
 
-    // PRIORIDADE 2: Fallback para variável de ambiente (global, apenas se não houver no banco)
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim() !== '' && process.env.OPENAI_API_KEY !== 'sua-chave-aqui') {
-      this.fastify.log.info('OpenAI API key encontrada em variável de ambiente (fallback global)');
-      return process.env.OPENAI_API_KEY;
-    }
+    // Fallback para env vars
+    if (!anthropicApiKey && process.env.ANTHROPIC_API_KEY) anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    if (!openaiApiKey && process.env.OPENAI_API_KEY) openaiApiKey = process.env.OPENAI_API_KEY;
 
-    return null;
+    const preferredProvider = anthropicApiKey ? 'anthropic' : openaiApiKey ? 'openai' : null;
+
+    return { anthropicApiKey, openaiApiKey, preferredProvider };
   }
 
-  /**
-   * Processa conversa usando OpenAI
-   */
+  // ─── Anthropic Claude ────────────────────────────────────────────────────
+
+  private async processWithAnthropic(
+    request: ConversationRequest,
+    history: Array<{ role: string; content: string }>,
+    apiKey: string,
+  ): Promise<AgentResponse> {
+    const promptConfig = await this.promptService.getPrompt('orquestrador', request.clienteId);
+    const systemPrompt = promptConfig?.content || this.defaultSystemPrompt();
+    const model = (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6') as string;
+
+    const anthropic = new Anthropic({ apiKey });
+
+    // Montar histórico para Anthropic (alternado user/assistant)
+    const messages: Anthropic.MessageParam[] = this.buildAnthropicMessages(history, request.message);
+
+    const response = await anthropic.messages.create({
+      model,
+      max_tokens: 600,
+      system: systemPrompt,
+      messages,
+    });
+
+    const rawText = (response.content[0] as Anthropic.TextBlock).text;
+    const parsed = this.parseAIResponse(rawText);
+
+    this.fastify.log.info({ model, provider: 'anthropic' }, 'Resposta gerada pelo agente IA');
+
+    return {
+      response: parsed.response,
+      currentStep: parsed.currentStep || 'qualifying',
+      nextAction: parsed.nextAction || 'continue',
+      metadata: parsed.metadata || {},
+      conversationData: { ...request.conversation_data, currentStep: parsed.currentStep },
+    };
+  }
+
+  private buildAnthropicMessages(
+    history: Array<{ role: string; content: string }>,
+    currentMessage: string,
+  ): Anthropic.MessageParam[] {
+    const msgs: Anthropic.MessageParam[] = [];
+
+    for (const msg of history.slice(-30)) {
+      const role: 'user' | 'assistant' = msg.role === 'user' ? 'user' : 'assistant';
+
+      // Anthropic exige alternância user/assistant — merge se consecutivos
+      if (msgs.length > 0 && msgs[msgs.length - 1].role === role) {
+        const last = msgs[msgs.length - 1];
+        last.content = `${last.content}\n${msg.content}`;
+      } else {
+        msgs.push({ role, content: msg.content });
+      }
+    }
+
+    // Garantir que termina com user (a mensagem atual)
+    if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
+      msgs[msgs.length - 1].content += `\n${currentMessage}`;
+    } else {
+      msgs.push({ role: 'user', content: currentMessage });
+    }
+
+    return msgs;
+  }
+
+  // ─── OpenAI ──────────────────────────────────────────────────────────────
+
   private async processWithOpenAI(
     request: ConversationRequest,
-    history: Array<{ role: string; content: string }>
+    history: Array<{ role: string; content: string }>,
+    apiKey: string,
   ): Promise<AgentResponse> {
-    // Buscar API key (env ou banco)
-    const apiKey = await this.getOpenAIApiKey(request.lead_id, request.clienteId);
-    
-    if (!apiKey) {
-      this.fastify.log.warn('OpenAI API key não encontrada, usando fallback');
-      return await this.processWithFallback(request, history);
-    }
-
-    // Criar cliente OpenAI com a chave encontrada
-    const openai = new OpenAI({
-      apiKey: apiKey,
-    });
-
-    // Obter prompt do serviço de prompts (tenta banco, depois padrão)
     const promptConfig = await this.promptService.getPrompt('orquestrador', request.clienteId);
-    
-    if (!promptConfig || !promptConfig.content) {
-      throw new Error('Prompt não encontrado');
-    }
-    
-    const systemPrompt = promptConfig.content;
+    const systemPrompt = promptConfig?.content || this.defaultSystemPrompt();
     const model = promptConfig?.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
     const temperature = promptConfig?.temperature ?? 0.4;
-    const maxTokens = promptConfig?.maxTokens ?? 500;
+    const maxTokens = promptConfig?.maxTokens ?? 600;
 
-    // Construir contexto da conversa
+    const openai = new OpenAI({ apiKey });
+
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      {
-        role: 'system',
-        content: systemPrompt,
-      },
+      { role: 'system', content: systemPrompt },
+      ...history.slice(-30).map(m => ({
+        role: (m.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        content: m.content,
+      })),
+      { role: 'user', content: request.message },
     ];
 
-    // Adicionar histórico
-    for (const msg of history.slice(-10)) { // Últimas 10 mensagens
-      messages.push({
-        role: msg.role === 'user' ? 'user' : msg.role === 'bot' ? 'assistant' : 'system',
-        content: msg.content,
-      });
-    }
-
-    // Adicionar mensagem atual
-    messages.push({
-      role: 'user',
-      content: request.message,
-    });
-
-    // Chamar OpenAI com configurações do prompt
     const completion = await openai.chat.completions.create({
       model,
       messages,
@@ -201,188 +216,141 @@ export class AgentService {
       response_format: { type: 'json_object' },
     });
 
-    const content = completion.choices[0].message.content;
-    if (!content) {
-      throw new Error('Resposta vazia da OpenAI');
-    }
+    const rawText = completion.choices[0].message.content || '';
+    const parsed = this.parseAIResponse(rawText);
 
-    // Parsear resposta JSON
-    let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch (e) {
-      this.fastify.log.warn('Resposta não é JSON válido, usando fallback');
-      return await this.processWithFallback(request, history);
-    }
-
-    // Salvar mensagens no banco
-    await this.saveMessage(request.lead_id, request.message, 'lead');
-    await this.saveMessage(request.lead_id, parsed.response, 'bot');
-
-    // Atualizar estado da conversa
-    const conversationData = {
-      ...request.conversation_data,
-      currentStep: parsed.currentStep,
-      nextAction: parsed.nextAction,
-      metadata: parsed.metadata,
-    };
+    this.fastify.log.info({ model, provider: 'openai' }, 'Resposta gerada pelo agente IA');
 
     return {
       response: parsed.response,
-      currentStep: parsed.currentStep,
-      nextAction: parsed.nextAction,
+      currentStep: parsed.currentStep || 'qualifying',
+      nextAction: parsed.nextAction || 'continue',
       metadata: parsed.metadata || {},
-      conversationData,
+      conversationData: { ...request.conversation_data, currentStep: parsed.currentStep },
     };
   }
 
-  /**
-   * Processa conversa usando fallback (lógica básica)
-   */
+  // ─── Fallback ─────────────────────────────────────────────────────────────
+
   private async processWithFallback(
     request: ConversationRequest,
-    history: Array<{ role: string; content: string }>
+    history: Array<{ role: string; content: string }>,
   ): Promise<AgentResponse> {
-    const conversationData = request.conversation_data || {
-      currentStep: 'greeting',
-      collectedData: {},
-    };
-
+    const conversationData = request.conversation_data || { currentStep: 'greeting', collectedData: {} };
     let response = '';
     let nextStep = conversationData.currentStep;
     const msgLower = request.message.toLowerCase();
 
-    // Lógica básica de fluxo
     switch (conversationData.currentStep) {
       case 'greeting':
-        response = 'Olá! Sou o Super SDR Advogados, seu assistente virtual de pré-atendimento jurídico. Estou aqui para ajudá-lo(a) a entender sua demanda e conectá-lo(a) com o advogado mais adequado.\n\nAntes de prosseguirmos, informamos que seus dados serão utilizados exclusivamente para contato e encaminhamento ao advogado responsável, em conformidade com a Lei Geral de Proteção de Dados (LGPD).\n\nVocê concorda em prosseguir com o atendimento?';
+        response = 'Olá! Sou Sofia, assistente jurídica de pré-atendimento. Antes de continuar, seus dados serão usados apenas para encaminhamento ao advogado responsável, conforme a LGPD. Você concorda em prosseguir?';
         nextStep = 'consent';
         break;
-
       case 'consent':
         if (msgLower.includes('sim') || msgLower.includes('concordo') || msgLower.includes('aceito')) {
-          response = 'Perfeito! Obrigado por seu consentimento. Para que eu possa ajudá-lo(a) da melhor forma, qual é o seu nome completo?';
+          response = 'Perfeito! Qual é o seu nome completo?';
           nextStep = 'demand';
           conversationData.collectedData.lgpdConsent = true;
         } else {
-          response = 'Compreendemos. Sem o consentimento, não podemos prosseguir com o atendimento. Agradecemos o contato.';
+          response = 'Sem o consentimento não posso prosseguir. Agradecemos o contato.';
           nextStep = 'rejected';
         }
         break;
-
       case 'demand':
         conversationData.collectedData.name = request.message;
-        response = `Olá, ${request.message}! Agora, por favor, me conte qual é a sua demanda jurídica? Descreva brevemente o problema que você está enfrentando.`;
+        response = `Olá, ${request.message}! Me conte brevemente qual é a sua demanda jurídica?`;
         nextStep = 'qualification';
         break;
-
       case 'qualification':
         conversationData.collectedData.demand = request.message;
-        response = 'Entendi sua demanda. Para que possamos direcioná-lo(a) ao advogado mais adequado, você gostaria de agendar uma consulta?';
+        response = 'Entendido. Gostaria de agendar uma consulta com um dos nossos advogados?';
         nextStep = 'scheduling';
         break;
-
       case 'scheduling':
-        if (msgLower.includes('sim') || msgLower.includes('agendar')) {
-          response = 'Perfeito! Nossa equipe entrará em contato em breve para agendar sua consulta. Obrigado pelo contato!';
-          nextStep = 'farewell';
-        } else {
-          response = 'Sem problemas. Se precisar de mais informações ou quiser agendar uma consulta, estarei à disposição.';
-          nextStep = 'farewell';
-        }
+        response = msgLower.includes('sim') || msgLower.includes('agendar')
+          ? 'Perfeito! Nossa equipe entrará em contato para confirmar o horário. Obrigado pela confiança!'
+          : 'Sem problemas. Qualquer dúvida é só nos chamar aqui. Até mais!';
+        nextStep = 'farewell';
         break;
-
       default:
-        response = 'Como posso ajudá-lo(a) hoje?';
+        response = 'Como posso ajudar?';
         nextStep = 'greeting';
     }
-
-    // Salvar mensagens no banco
-    await this.saveMessage(request.lead_id, request.message, 'lead');
-    await this.saveMessage(request.lead_id, response, 'bot');
 
     return {
       response,
       currentStep: nextStep,
       nextAction: 'continue',
       metadata: {},
-      conversationData: {
-        ...conversationData,
-        currentStep: nextStep,
-      },
+      conversationData: { ...conversationData, currentStep: nextStep },
     };
   }
 
-  /**
-   * Recupera histórico de conversa do banco
-   */
-  private async getConversationHistory(leadId: string): Promise<Array<{ role: string; content: string }>> {
-    // Buscar conversa do lead
-    const conversation = await this.prisma.conversation.findFirst({
-      where: {
-        leadId,
-      },
-      include: {
-        messages: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-          take: 20, // Últimas 20 mensagens
-        },
-      },
-    });
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    if (!conversation) {
-      return [];
+  private parseAIResponse(raw: string): any {
+    try {
+      // Tentar parsear como JSON (OpenAI com json_object)
+      const parsed = JSON.parse(raw);
+      return parsed;
+    } catch {
+      // Anthropic retorna texto livre — montar estrutura
+      return {
+        response: raw.replace(/^```[\w]*\n?|```$/g, '').trim(),
+        currentStep: 'qualifying',
+        nextAction: 'continue',
+        metadata: {},
+      };
     }
-
-    return conversation.messages.map((msg) => ({
-      role: msg.senderType === 'lead' ? 'user' : msg.senderType === 'ai' ? 'assistant' : 'system',
-      content: msg.content,
-    }));
   }
 
-  /**
-   * Salva mensagem no banco
-   */
-  private async saveMessage(leadId: string, content: string, senderType: 'lead' | 'bot' | 'system'): Promise<void> {
-    // Buscar ou criar conversa
-    let conversation = await this.prisma.conversation.findFirst({
-      where: {
-        leadId,
-      },
-    });
+  private defaultSystemPrompt(): string {
+    return `Você é Sofia, assistente jurídica de pré-atendimento de um escritório de advocacia. Seu objetivo é qualificar leads de forma empática e profissional.
 
-    if (!conversation) {
-      // Buscar lead para obter tenantId
-      const lead = await this.prisma.lead.findUnique({
-        where: { id: leadId },
-      });
+REGRAS OBRIGATÓRIAS:
+- Nunca prometa resultados jurídicos
+- Nunca ofereça consultoria jurídica direta
+- Colete: nome, área do direito, descrição do problema, urgência, disponibilidade
+- Use linguagem simples e acolhedora
+- Máximo 3 parágrafos por mensagem
+- Não use travessões (—) nas mensagens
 
-      if (!lead) {
-        this.fastify.log.warn({ leadId }, 'Lead não encontrado ao salvar mensagem');
-        return;
-      }
+Responda SEMPRE em JSON:
+{
+  "response": "sua resposta para o lead",
+  "currentStep": "greeting|consent|collecting_info|qualifying|scheduling|farewell",
+  "nextAction": "continue|schedule|transfer_human|close",
+  "metadata": {
+    "legalAreaSuggested": "área detectada ou null",
+    "urgencyDetected": "baixa|media|alta ou null",
+    "requiresHumanReview": false
+  }
+}`;
+  }
 
-      // Criar conversa
-      conversation = await this.prisma.conversation.create({
-        data: {
-          tenantId: lead.tenantId,
-          leadId,
-          channel: 'whatsapp',
-          assignedType: 'ai',
-          status: 'active',
+  private async getConversationHistory(leadId: string): Promise<Array<{ role: string; content: string }>> {
+    try {
+      const conversation = await this.prisma.conversation.findFirst({
+        where: { leadId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+            take: 30,
+            where: { senderType: { in: ['lead', 'ai', 'sdr'] } },
+          },
         },
       });
-    }
 
-    // Salvar mensagem
-    await this.prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        content,
-        senderType: senderType === 'bot' ? 'ai' : senderType,
-      },
-    });
+      if (!conversation) return [];
+
+      return conversation.messages.map(msg => ({
+        role: msg.senderType === 'lead' ? 'user' : 'assistant',
+        content: msg.content,
+      }));
+    } catch (err: any) {
+      this.fastify.log.warn({ err: err.message }, 'Erro ao buscar histórico');
+      return [];
+    }
   }
 }
