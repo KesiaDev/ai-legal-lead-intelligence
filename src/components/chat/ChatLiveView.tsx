@@ -61,8 +61,8 @@ export function ChatLiveView() {
 
     fetchConversations();
     
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(fetchConversations, 30000);
+    // Atualizar a cada 3 segundos para demo ao vivo
+    const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
   }, []);
 
