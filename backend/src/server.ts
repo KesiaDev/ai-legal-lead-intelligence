@@ -701,6 +701,20 @@ async function build() {
     return reply.status(201).send({ lead, created: true });
   });
 
+  fastify.delete('/api/leads/by-phone/:phone', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const user = request.user as { id: string; tenantId: string } | undefined;
+    if (!user?.tenantId) return reply.status(401).send({ error: 'Não autenticado' });
+    const { phone } = request.params as { phone: string };
+    const lead = await prisma.lead.findFirst({ where: { phone, tenantId: user.tenantId } });
+    if (!lead) return reply.send({ deleted: false });
+    await prisma.message.deleteMany({ where: { conversation: { leadId: lead.id } } });
+    await prisma.conversation.deleteMany({ where: { leadId: lead.id } });
+    await prisma.lead.delete({ where: { id: lead.id } });
+    return reply.send({ deleted: true, leadId: lead.id });
+  });
+
   fastify.get('/api/leads', {
     preHandler: [authenticate],
   }, async (request, reply) => {
