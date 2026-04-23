@@ -34,52 +34,45 @@ export interface Message {
 export function ChatLiveView() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // apenas no carregamento inicial
   const [error, setError] = useState<string | null>(null);
   const selectedIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     selectedIdRef.current = selectedConversation?.id ?? null;
   }, [selectedConversation]);
 
-  // Buscar conversas — loading visível só na primeira vez
+  // Poll silencioso — nunca bloqueia a UI com spinner
   useEffect(() => {
-    let first = true;
-
     const fetchConversations = async () => {
       try {
-        if (first) setIsLoading(true);
-        setError(null);
         const response = await api.get('/api/conversations');
+        if (!mountedRef.current) return;
         const data: Conversation[] = response.data.conversations || [];
         setConversations(data);
-
-        // Selecionar primeira conversa apenas se nenhuma estiver selecionada
         if (data.length > 0 && !selectedIdRef.current) {
           setSelectedConversation(data[0]);
         }
       } catch (err: any) {
         console.error('Erro ao buscar conversas:', err);
-        if (first) setError(err.response?.data?.message || 'Erro ao carregar conversas');
-      } finally {
-        if (first) { setIsLoading(false); first = false; }
       }
     };
 
     fetchConversations();
-
-    // Poll silencioso a cada 3s — sem mostrar spinner
     const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Atualizar conversa selecionada quando lista mudar
+  // Manter conversa selecionada atualizada
   useEffect(() => {
     if (selectedConversation) {
       const updated = conversations.find(c => c.id === selectedConversation.id);
-      if (updated) {
-        setSelectedConversation(updated);
-      }
+      if (updated) setSelectedConversation(updated);
     }
   }, [conversations]);
 
@@ -88,24 +81,9 @@ export function ChatLiveView() {
   };
 
   const handleUpdateConversation = (updated: Conversation) => {
-    setConversations(prev => 
-      prev.map(c => c.id === updated.id ? updated : c)
-    );
-    if (selectedConversation?.id === updated.id) {
-      setSelectedConversation(updated);
-    }
+    setConversations(prev => prev.map(c => c.id === updated.id ? updated : c));
+    if (selectedConversation?.id === updated.id) setSelectedConversation(updated);
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-muted-foreground">Carregando conversas...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
