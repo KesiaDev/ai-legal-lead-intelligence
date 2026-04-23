@@ -24,6 +24,7 @@ import { registerAdminRoutes } from './api/admin.routes';
 import { followUpRoutes } from './api/followup.routes';
 import { reportsRoutes } from './api/reports.routes';
 import { departmentsRoutes } from './api/departments.routes';
+import { registerConversationsRoutes } from './api/conversations.routes';
 import { checkLeadLimit, getPlanUsage, PlanLimitError } from './services/planLimits.service';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
@@ -571,6 +572,11 @@ async function build() {
   // DEPARTAMENTOS
   // ======================================================
   await departmentsRoutes(fastify);
+
+  // ======================================================
+  // CONVERSAS (Chat ao Vivo)
+  // ======================================================
+  await registerConversationsRoutes(fastify);
 
   // ======================================================
   // GERENCIAMENTO DE TENANTS (CLIENTES)
