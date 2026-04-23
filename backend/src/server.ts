@@ -744,6 +744,25 @@ async function build() {
   // ======================================================
   // API DE CONVERSAS (requer autenticação)
   // ======================================================
+
+  // Criar conversa para um lead
+  fastify.post('/api/conversations', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const user = request.user as { id: string; tenantId: string } | undefined;
+    const { leadId, channel = 'whatsapp', assignedType = 'ai' } = request.body as any;
+    if (!leadId) return reply.status(400).send({ error: 'leadId obrigatório' });
+    const lead = await prisma.lead.findFirst({ where: { id: leadId, tenantId: user?.tenantId } });
+    if (!lead) return reply.status(404).send({ error: 'Lead não encontrado' });
+    let conversation = await prisma.conversation.findFirst({ where: { leadId, channel, status: 'active' } });
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: { leadId, tenantId: user!.tenantId, channel, assignedType, status: 'active' },
+      });
+    }
+    return reply.send({ conversation });
+  });
+
   fastify.get('/api/conversations', {
     preHandler: [authenticate],
   }, async (request, reply) => {
