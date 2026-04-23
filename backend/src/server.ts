@@ -685,6 +685,22 @@ async function build() {
   // ======================================================
   // API DE LEADS (requer autenticação)
   // ======================================================
+
+  fastify.post('/api/leads', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const user = request.user as { id: string; tenantId: string } | undefined;
+    if (!user?.tenantId) return reply.status(401).send({ error: 'Não autenticado' });
+    const { name, phone, email, legalArea, status, urgency, city, state, demandDescription } = request.body as any;
+    if (!name || !phone) return reply.status(400).send({ error: 'name e phone são obrigatórios' });
+    const existing = await prisma.lead.findFirst({ where: { phone, tenantId: user.tenantId } });
+    if (existing) return reply.send({ lead: existing, created: false });
+    const lead = await prisma.lead.create({
+      data: { tenantId: user.tenantId, name, phone, email, legalArea, status: status || 'novo', urgency, city, state, demandDescription, lgpdConsent: true, lgpdConsentDate: new Date() },
+    });
+    return reply.status(201).send({ lead, created: true });
+  });
+
   fastify.get('/api/leads', {
     preHandler: [authenticate],
   }, async (request, reply) => {
