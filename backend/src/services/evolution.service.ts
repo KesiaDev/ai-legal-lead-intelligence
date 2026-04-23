@@ -181,6 +181,14 @@ export class EvolutionService {
 
   // ─── Send Text ────────────────────────────────────────────────────────────
 
+  private cleanForWhatsApp(text: string): string {
+    return text
+      .replace(/ — /g, ', ')
+      .replace(/— /g, ', ')
+      .replace(/ —/g, ',')
+      .replace(/—/g, ',');
+  }
+
   async sendText(to: string, text: string, tenantId: string): Promise<void> {
     const config = await this.getConfig(tenantId);
 
@@ -190,12 +198,13 @@ export class EvolutionService {
     }
 
     const phone = this.normalizePhone(to);
+    const cleanText = this.cleanForWhatsApp(text);
     const url = `${config.serverUrl}/message/sendText/${config.instanceName}`;
 
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: config.apiKey },
-      body: JSON.stringify({ number: phone, text }),
+      body: JSON.stringify({ number: phone, text: cleanText }),
     }).then(async (res) => {
       if (!res.ok) {
         const err = await res.text();

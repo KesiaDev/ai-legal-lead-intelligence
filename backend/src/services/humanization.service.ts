@@ -96,12 +96,24 @@ export function selectVariation(category: string, previousResponses: string[]): 
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// Remove travessões (—) que soam robóticos em conversa de WhatsApp
+function removeEmDashes(text: string): string {
+  return text
+    .replace(/ — /g, ', ')
+    .replace(/— /g, ', ')
+    .replace(/ —/g, ',')
+    .replace(/—/g, ',');
+}
+
 // Pipeline completo de ultra-humanização
 export function ultraHumanize(
   text: string,
   options: HumanizationOptions = {}
 ): { text: string; delayMs: number } {
   let result = text;
+
+  // 0. Remover travessões (soam robóticos em WhatsApp)
+  result = removeEmDashes(result);
 
   // 1. Adaptação de perfil
   if (options.profileType && options.profileType !== 'auto') {
