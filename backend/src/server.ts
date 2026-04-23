@@ -24,7 +24,6 @@ import { registerAdminRoutes } from './api/admin.routes';
 import { followUpRoutes } from './api/followup.routes';
 import { reportsRoutes } from './api/reports.routes';
 import { departmentsRoutes } from './api/departments.routes';
-import { registerConversationsRoutes } from './api/conversations.routes';
 import { checkLeadLimit, getPlanUsage, PlanLimitError } from './services/planLimits.service';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
@@ -573,10 +572,7 @@ async function build() {
   // ======================================================
   await departmentsRoutes(fastify);
 
-  // ======================================================
-  // CONVERSAS (Chat ao Vivo)
-  // ======================================================
-  await registerConversationsRoutes(fastify);
+  // Nota: rotas de conversas já registradas inline neste arquivo (linhas ~751+)
 
   // ======================================================
   // GERENCIAMENTO DE TENANTS (CLIENTES)
@@ -1107,6 +1103,58 @@ async function build() {
         error: 'Erro ao enviar mensagem',
         message: errorMessage,
       });
+    }
+  });
+
+  // Buscar conversa individual
+  fastify.get('/api/conversations/:id', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const { id } = request.params as { id: string };
+      const userTenantId = request.user?.tenantId;
+      if (!userTenantId) return reply.status(401).send({ error: 'Não autenticado' });
+
+      const conversation = await prisma.conversation.findFirst({
+        where: { id, tenantId: userTenantId },
+        include: {
+          lead: { select: { id: true, name: true, phone: true, email: true, status: true } },
+          messages: { orderBy: { createdAt: 'asc' }, take: 100 },
+        },
+      });
+
+      if (!conversation) return reply.status(404).send({ error: 'Conversa não encontrada' });
+      return reply.send({ conversation });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Atualizar status do lead (usado pelo ChatActions)
+  fastify.patch('/api/leads/:leadId', {
+    preHandler: [authenticate],
+  }, async (request: any, reply: any) => {
+    try {
+      const { leadId } = request.params as { leadId: string };
+      const userTenantId = request.user?.tenantId;
+      if (!userTenantId) return reply.status(401).send({ error: 'Não autenticado' });
+
+      const { status, legalArea, name } = request.body as any;
+      const lead = await prisma.lead.findFirst({ where: { id: leadId, tenantId: userTenantId } });
+      if (!lead) return reply.status(404).send({ error: 'Lead não encontrado' });
+
+      const updated = await prisma.lead.update({
+        where: { id: leadId },
+        data: {
+          ...(status && { status }),
+          ...(legalArea && { legalArea }),
+          ...(name && { name }),
+        },
+      });
+
+      return reply.send({ lead: updated });
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
     }
   });
 
