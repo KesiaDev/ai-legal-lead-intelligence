@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ConversationsSidebar } from './ConversationsSidebar';
 import { ChatMessages } from './ChatMessages';
 import { ChatActions } from './ChatActions';
@@ -34,34 +34,41 @@ export interface Message {
 export function ChatLiveView() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // apenas no carregamento inicial
   const [error, setError] = useState<string | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
 
-  // Buscar conversas
   useEffect(() => {
+    selectedIdRef.current = selectedConversation?.id ?? null;
+  }, [selectedConversation]);
+
+  // Buscar conversas — loading visível só na primeira vez
+  useEffect(() => {
+    let first = true;
+
     const fetchConversations = async () => {
       try {
-        setIsLoading(true);
+        if (first) setIsLoading(true);
         setError(null);
         const response = await api.get('/api/conversations');
-        const data = response.data.conversations || [];
+        const data: Conversation[] = response.data.conversations || [];
         setConversations(data);
-        
-        // Selecionar primeira conversa se houver
-        if (data.length > 0 && !selectedConversation) {
+
+        // Selecionar primeira conversa apenas se nenhuma estiver selecionada
+        if (data.length > 0 && !selectedIdRef.current) {
           setSelectedConversation(data[0]);
         }
       } catch (err: any) {
         console.error('Erro ao buscar conversas:', err);
-        setError(err.response?.data?.message || 'Erro ao carregar conversas');
+        if (first) setError(err.response?.data?.message || 'Erro ao carregar conversas');
       } finally {
-        setIsLoading(false);
+        if (first) { setIsLoading(false); first = false; }
       }
     };
 
     fetchConversations();
-    
-    // Atualizar a cada 3 segundos para demo ao vivo
+
+    // Poll silencioso a cada 3s — sem mostrar spinner
     const interval = setInterval(fetchConversations, 3000);
     return () => clearInterval(interval);
   }, []);
