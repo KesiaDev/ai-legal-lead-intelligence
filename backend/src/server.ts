@@ -24,11 +24,16 @@ import { registerAdminRoutes } from './api/admin.routes';
 import { followUpRoutes } from './api/followup.routes';
 import { reportsRoutes } from './api/reports.routes';
 import { departmentsRoutes } from './api/departments.routes';
+import { registerOnboardingRoutes } from './api/onboarding.routes';
+import { registerAsaasWebhook } from './api/webhooks/asaas.webhook';
+import { registerMediaRoutes } from './api/media.routes';
+import multipart from '@fastify/multipart';
 import { checkLeadLimit, getPlanUsage, PlanLimitError } from './services/planLimits.service';
 import { classifyLead } from './services/leadClassifier';
 import { routeLead, getDefaultRouting } from './services/leadRouter';
 import { getOrCreateTenantByClienteId as getOrCreateTenantByClienteIdUtil, getOrCreateDefaultTenant } from './utils/tenant';
 import { authenticate } from './middleware/auth';
+import { FollowUpWorker } from './workers/followup.worker';
 
 // ======================================================
 // TIPOS
@@ -163,6 +168,11 @@ async function build() {
   await fastify.register(cors, {
     origin: true,
     credentials: true,
+  });
+
+  // Multipart para upload de arquivos (limite 50MB)
+  await fastify.register(multipart, {
+    limits: { fileSize: 50 * 1024 * 1024, files: 1 },
   });
 
   // ---------------- JWT ----------------
@@ -571,6 +581,13 @@ async function build() {
   // DEPARTAMENTOS
   // ======================================================
   await departmentsRoutes(fastify);
+
+  // ======================================================
+  // ONBOARDING SELF-SERVICE + WEBHOOKS ASAAS
+  // ======================================================
+  await registerOnboardingRoutes(fastify);
+  await registerAsaasWebhook(fastify);
+  await registerMediaRoutes(fastify);
 
   // Nota: rotas de conversas já registradas inline neste arquivo (linhas ~751+)
 
@@ -2043,6 +2060,20 @@ async function start() {
     });
 
     console.log(`🚀 API rodando na porta ${PORT}`);
+
+    // Inicia worker de follow-ups automáticos
+    const followUpWorker = new FollowUpWorker(app);
+    followUpWorker.start();
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      followUpWorker.stop();
+      app.close();
+    });
+    process.on('SIGINT', () => {
+      followUpWorker.stop();
+      app.close();
+    });
   } catch (err) {
     console.error(err);
     process.exit(1);
