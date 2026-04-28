@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -172,7 +173,41 @@ export function IntegrationsView() {
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [configOpen, setConfigOpen] = useState<Integration | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+
+  // Carrega integrações já configuradas no banco
+  useEffect(() => {
+    async function load() {
+      try {
+        // Carrega IntegrationConfig (Evolution, OpenAI, etc.)
+        const [configRes, userIntRes] = await Promise.all([
+          api.get('/api/integrations').catch(() => null),
+          api.get('/api/integrations/third-party').catch(() => null),
+        ]);
+
+        const cfg = configRes?.data || {};
+        const userInts: any[] = userIntRes?.data?.data || [];
+
+        const state: Record<string, boolean> = {};
+
+        // Evolution API
+        if (cfg.evolutionApiUrl && cfg.evolutionApiKey) state['evolution'] = true;
+        // OpenAI
+        if (cfg.openaiApiKey) state['openai'] = true;
+        // N8N
+        if (cfg.n8nWebhookUrl) state['n8n'] = true;
+
+        // UserIntegrations (CRM, Calendar)
+        userInts.forEach((i: any) => {
+          if (i.isActive) state[i.provider] = true;
+        });
+
+        setConnected(state);
+      } catch {}
+    }
+    load();
+  }, []);
 
   function openConfig(integration: Integration) {
     setFormValues({});
@@ -186,19 +221,50 @@ export function IntegrationsView() {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' });
       return;
     }
+
+    setSaving(true);
     try {
-      // In production: POST /api/integrations with { type: configOpen.id, config: formValues }
+      // Salva no banco via IntegrationConfig ou UserIntegration
+      if (configOpen.category === 'whatsapp' && configOpen.id === 'evolution') {
+        await api.patch('/api/integrations', {
+          evolutionApiUrl: formValues.serverUrl,
+          evolutionApiKey: formValues.apiKey,
+          evolutionInstance: formValues.instanceName,
+        });
+      } else if (configOpen.category === 'crm' || configOpen.category === 'calendar' || configOpen.category === 'legal') {
+        await api.post('/api/integrations/third-party', {
+          type: configOpen.category,
+          provider: configOpen.id,
+          config: formValues,
+        });
+      } else {
+        // Outros (OpenAI, N8N, etc.) — salva em IntegrationConfig genérico
+        await api.patch('/api/integrations', {
+          [`${configOpen.id}ApiKey`]: formValues.apiKey || formValues.token || Object.values(formValues)[0],
+        });
+      }
+
       setConnected(prev => ({ ...prev, [configOpen.id]: true }));
       toast({ title: `${configOpen.name} conectado com sucesso!` });
       setConfigOpen(null);
-    } catch {
-      toast({ title: 'Erro ao conectar', variant: 'destructive' });
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar integração', description: err?.response?.data?.error || err.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   }
 
-  function handleDisconnect(id: string) {
-    setConnected(prev => ({ ...prev, [id]: false }));
-    toast({ title: 'Integração desconectada' });
+  async function handleDisconnect(id: string) {
+    try {
+      const integration = INTEGRATIONS.find(i => i.id === id);
+      if (integration?.category === 'crm' || integration?.category === 'calendar' || integration?.category === 'legal') {
+        await api.delete(`/api/integrations/third-party/${id}`).catch(() => {});
+      }
+      setConnected(prev => ({ ...prev, [id]: false }));
+      toast({ title: 'Integração desconectada' });
+    } catch {
+      toast({ title: 'Integração desconectada' });
+    }
   }
 
   const connectedCount = INTEGRATIONS.filter(i => connected[i.id]).length;
