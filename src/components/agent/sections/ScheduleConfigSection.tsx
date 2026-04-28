@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAgent } from '@/contexts/AgentContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,11 +29,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Clock, 
-  Plus, 
-  Users, 
-  Bell, 
+import {
+  Clock,
+  Plus,
+  Users,
+  Bell,
   Calendar,
   Settings2,
   MoreVertical,
@@ -45,11 +45,16 @@ import {
   MapPin,
   Video,
   Phone,
+  Eye,
+  Search,
+  Zap,
 } from 'lucide-react';
+import { followupsApi, FollowUpItem, FollowUpStats } from '@/api/followups';
+import { cn } from '@/lib/utils';
 
 export function ScheduleConfigSection() {
-  const { 
-    scheduleConfig, 
+  const {
+    scheduleConfig,
     updateScheduleConfig,
     lawyers,
     addLawyer,
@@ -63,7 +68,29 @@ export function ScheduleConfigSection() {
     deleteReminder,
     eventConfig,
     updateEventConfig,
+    prompts,
   } = useAgent();
+
+  const [scheduledReminders, setScheduledReminders] = useState<FollowUpItem[]>([]);
+  const [reminderStats, setReminderStats] = useState<FollowUpStats>({ pending: 0, sent: 0, failed: 0 });
+  const [loadingReminders, setLoadingReminders] = useState(false);
+  const [reminderSearch, setReminderSearch] = useState('');
+
+  const loadScheduledReminders = async () => {
+    setLoadingReminders(true);
+    try {
+      const items = await followupsApi.list({ limit: 500 });
+      const rem = items.filter(i => i.type === 'lembrete_consulta');
+      setScheduledReminders(rem);
+      const pending = rem.filter(r => r.status === 'pending').length;
+      const sent = rem.filter(r => r.status === 'sent').length;
+      const failed = rem.filter(r => r.status === 'failed').length;
+      setReminderStats({ pending, sent, failed });
+    } catch {}
+    setLoadingReminders(false);
+  };
+
+  useEffect(() => { loadScheduledReminders(); }, []);
 
   const [isLawyerDialogOpen, setIsLawyerDialogOpen] = useState(false);
   const [editingLawyer, setEditingLawyer] = useState<any>(null);
@@ -167,12 +194,13 @@ export function ScheduleConfigSection() {
       <Card>
         <Tabs defaultValue="rules" className="w-full">
           <CardHeader className="pb-0">
-            <TabsList className="grid w-full grid-cols-5 bg-muted/50">
+            <TabsList className="grid w-full grid-cols-6 bg-muted/50">
               <TabsTrigger value="rules">Regras</TabsTrigger>
               <TabsTrigger value="event">Evento</TabsTrigger>
               <TabsTrigger value="hours">Horários</TabsTrigger>
               <TabsTrigger value="rotation">Rodízio</TabsTrigger>
               <TabsTrigger value="reminders">Lembretes</TabsTrigger>
+              <TabsTrigger value="scheduled">Agendados</TabsTrigger>
             </TabsList>
           </CardHeader>
 
@@ -522,50 +550,238 @@ export function ScheduleConfigSection() {
             </TabsContent>
 
             {/* Reminders Tab */}
-            <TabsContent value="reminders" className="space-y-6 mt-0">
-              <div className="flex items-center justify-between mb-4">
+            <TabsContent value="reminders" className="space-y-4 mt-0">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Bell className="w-5 h-5 text-muted-foreground" />
-                  <h3 className="font-semibold">Lembretes Automáticos</h3>
+                  <h3 className="font-semibold text-sm">Horários para envio de lembretes</h3>
                 </div>
-                <Button onClick={() => setIsReminderDialogOpen(true)} size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Lembrete
-                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">24/7</span>
+                  <Switch />
+                </div>
+              </div>
+              {/* Per-day reminder hours */}
+              <div className="space-y-2 pb-4 border-b">
+                {(scheduleConfig.availableHours ?? []).map((h, idx) => (
+                  <div key={h.day} className="flex items-center gap-3 text-sm py-1">
+                    <span className="w-10 font-medium">{h.day}</span>
+                    {h.isOpen ? (
+                      <>
+                        <Input type="time" value={h.startTime} onChange={e => {
+                          const arr = [...(scheduleConfig.availableHours ?? [])];
+                          arr[idx] = { ...arr[idx], startTime: e.target.value };
+                          updateScheduleConfig({ availableHours: arr });
+                        }} className="w-28 h-8" />
+                        <span className="text-muted-foreground">até</span>
+                        <Input type="time" value={h.endTime} onChange={e => {
+                          const arr = [...(scheduleConfig.availableHours ?? [])];
+                          arr[idx] = { ...arr[idx], endTime: e.target.value };
+                          updateScheduleConfig({ availableHours: arr });
+                        }} className="w-28 h-8" />
+                        <button className="text-destructive">×</button>
+                        <button className="text-primary">+</button>
+                        <div className="ml-auto flex items-center gap-2">
+                          <Switch checked={h.is24h ?? false} onCheckedChange={v => {
+                            const arr = [...(scheduleConfig.availableHours ?? [])];
+                            arr[idx] = { ...arr[idx], is24h: v };
+                            updateScheduleConfig({ availableHours: arr });
+                          }} />
+                          <span className="text-xs text-muted-foreground">24h</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground">Fechado</span>
+                        <button
+                          onClick={() => {
+                            const arr = [...(scheduleConfig.availableHours ?? [])];
+                            arr[idx] = { ...arr[idx], isOpen: true };
+                            updateScheduleConfig({ availableHours: arr });
+                          }}
+                          className="ml-auto text-primary text-xs hover:underline"
+                        >Ativar</button>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              <div className="space-y-3">
-                {reminders.map((reminder) => (
-                  <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Bell className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{reminder.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {reminder.triggerBefore >= 1440 
-                            ? `${Math.floor(reminder.triggerBefore / 1440)}h antes`
-                            : `${reminder.triggerBefore} min antes`
-                          } via {reminder.channel}
-                        </p>
+              {/* Registered reminders */}
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Lembretes Cadastrados</h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">{reminders.length}/∞</Badge>
+                  <Button onClick={() => setIsReminderDialogOpen(true)} size="sm">
+                    <Plus className="w-3.5 h-3.5 mr-1.5" />
+                    Novo Lembrete
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {reminders.map((reminder, idx) => (
+                  <div key={reminder.id} className="border rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-amber-500" />
+                        <span className="font-medium text-sm">Lembrete {idx + 1}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {(reminder as any).reminderType === 'estatica' ? 'Estática' : 'Dinâmica'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={reminder.isActive}
+                          onCheckedChange={v => updateReminder(reminder.id, { isActive: v })}
+                        />
+                        <button onClick={() => deleteReminder(reminder.id)} className="text-muted-foreground hover:text-destructive">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="capitalize">{reminder.channel}</Badge>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tipo</label>
+                        <Select
+                          value={(reminder as any).reminderType ?? 'dinamica'}
+                          onValueChange={v => updateReminder(reminder.id, { reminderType: v as any })}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="dinamica">Dinâmica (Prompt)</SelectItem>
+                            <SelectItem value="estatica">Estática (Mensagem)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Antecedência (Minutos)</label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={reminder.triggerBefore}
+                          onChange={e => updateReminder(reminder.id, { triggerBefore: Number(e.target.value) })}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                    {((reminder as any).reminderType ?? 'dinamica') === 'dinamica' && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Prompt Selecionado</label>
+                        <Select
+                          value={(reminder as any).promptId ?? ''}
+                          onValueChange={v => updateReminder(reminder.id, { promptId: v } as any)}
+                        >
+                          <SelectTrigger className="h-9"><SelectValue placeholder="Selecione um prompt..." /></SelectTrigger>
+                          <SelectContent>
+                            {prompts.filter(p => p.status === 'ativo').map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs text-muted-foreground">Desligar IA após envio</span>
                       <Switch
-                        checked={reminder.isActive}
-                        onCheckedChange={(checked) => updateReminder(reminder.id, { isActive: checked })}
+                        checked={(reminder as any).disableAiAfterSend ?? false}
+                        onCheckedChange={v => updateReminder(reminder.id, { disableAiAfterSend: v } as any)}
                       />
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => deleteReminder(reminder.id)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
                     </div>
                   </div>
                 ))}
+                {reminders.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum lembrete cadastrado
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Lembretes Agendados Tab */}
+            <TabsContent value="scheduled" className="mt-0 space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="border rounded-lg p-4 flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span className="text-sm text-muted-foreground">Pendentes</span>
+                  <span className="ml-auto text-2xl font-bold">{reminderStats.pending}</span>
+                </div>
+                <div className="border rounded-lg p-4 flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-sm text-muted-foreground">Enviados</span>
+                  <span className="ml-auto text-2xl font-bold text-green-600">{reminderStats.sent}</span>
+                </div>
+                <div className="border rounded-lg p-4 flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-sm text-muted-foreground">Falhas</span>
+                  <span className="ml-auto text-2xl font-bold text-red-600">{reminderStats.failed}</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-sm">Lembretes Agendados</h3>
+                <Button variant="ghost" size="sm" onClick={loadScheduledReminders} disabled={loadingReminders}>
+                  <RefreshCw className={cn('w-3.5 h-3.5 mr-1.5', loadingReminders && 'animate-spin')} />
+                  Atualizar
+                </Button>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome ou telefone..."
+                  value={reminderSearch}
+                  onChange={e => setReminderSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-4 py-3 font-medium">Contato</th>
+                      <th className="text-left px-4 py-3 font-medium">Tipo</th>
+                      <th className="text-center px-4 py-3 font-medium">Status</th>
+                      <th className="text-center px-4 py-3 font-medium">Agendado para</th>
+                      <th className="text-center px-4 py-3 font-medium">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingReminders ? (
+                      <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />Carregando...
+                      </td></tr>
+                    ) : scheduledReminders.filter(r =>
+                      !reminderSearch ||
+                      r.lead?.name?.toLowerCase().includes(reminderSearch.toLowerCase()) ||
+                      r.lead?.phone?.includes(reminderSearch)
+                    ).length === 0 ? (
+                      <tr><td colSpan={5} className="text-center py-10 text-muted-foreground text-sm">Nenhum lembrete agendado</td></tr>
+                    ) : (
+                      scheduledReminders.filter(r =>
+                        !reminderSearch ||
+                        r.lead?.name?.toLowerCase().includes(reminderSearch.toLowerCase()) ||
+                        r.lead?.phone?.includes(reminderSearch)
+                      ).map(r => (
+                        <tr key={r.id} className="border-t hover:bg-muted/20">
+                          <td className="px-4 py-3">
+                            <div className="font-medium">{r.lead?.name || '—'}</div>
+                            <div className="text-xs text-muted-foreground">{r.lead?.phone}</div>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">{r.type}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant={r.status === 'sent' ? 'default' : r.status === 'failed' ? 'destructive' : 'secondary'} className="text-xs">
+                              {r.status === 'pending' ? 'Pendente' : r.status === 'sent' ? 'Enviado' : r.status === 'failed' ? 'Falha' : r.status}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-center text-muted-foreground text-xs">
+                            {new Date(r.scheduledAt).toLocaleString('pt-BR')}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <button className="text-muted-foreground hover:text-foreground"><Eye className="w-4 h-4" /></button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </TabsContent>
           </CardContent>

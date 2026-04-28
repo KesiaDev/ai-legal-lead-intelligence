@@ -352,6 +352,11 @@ const defaultKnowledgeBase: KnowledgeBaseItem[] = [
 
 const defaultFollowUp: FollowUpConfig = {
   businessHours: defaultBusinessHours,
+  fups: [
+    { id: 'fup-1', type: 'dinamica', hours: 2, minutes: 0, promptId: '', isActive: true },
+    { id: 'fup-2', type: 'dinamica', hours: 3, minutes: 0, promptId: '', isActive: true },
+    { id: 'fup-3', type: 'dinamica', hours: 15, minutes: 0, promptId: '', isActive: true },
+  ],
   cadence: {
     firstFollowUp: 24,
     secondFollowUp: 48,

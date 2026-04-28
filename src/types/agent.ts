@@ -47,10 +47,21 @@ export interface KnowledgeBaseItem {
   createdAt: Date;
 }
 
+export interface FupEntry {
+  id: string;
+  type: 'dinamica' | 'estatica';
+  hours: number;
+  minutes: number;
+  promptId?: string;
+  message?: string;
+  isActive: boolean;
+}
+
 export interface FollowUpConfig {
   businessHours: BusinessHours[];
+  fups: FupEntry[];
   cadence: {
-    firstFollowUp: number; // hours
+    firstFollowUp: number;
     secondFollowUp: number;
     finalFollowUp: number;
   };

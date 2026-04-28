@@ -32,8 +32,11 @@ export interface ReminderConfig {
   id: string;
   name: string;
   triggerBefore: number; // minutes
+  reminderType: 'dinamica' | 'estatica';
   channel: 'whatsapp' | 'email' | 'sms';
   templateId: string;
+  promptId?: string;
+  disableAiAfterSend?: boolean;
   isActive: boolean;
 }
 
@@ -97,18 +100,42 @@ export const DEFAULT_ROTATION_RULES: RotationRule[] = [
 export const DEFAULT_REMINDERS: ReminderConfig[] = [
   {
     id: 'reminder-1',
-    name: 'Lembrete 24h antes',
-    triggerBefore: 1440, // 24 hours
+    name: 'Lembrete 48h antes',
+    triggerBefore: 2880,
+    reminderType: 'dinamica',
     channel: 'whatsapp',
-    templateId: 'tpl-6',
+    templateId: '',
+    promptId: '',
     isActive: true,
   },
   {
     id: 'reminder-2',
-    name: 'Lembrete 1h antes',
-    triggerBefore: 60,
+    name: 'Lembrete 24h antes',
+    triggerBefore: 1440,
+    reminderType: 'dinamica',
     channel: 'whatsapp',
-    templateId: 'tpl-6',
+    templateId: '',
+    promptId: '',
+    isActive: true,
+  },
+  {
+    id: 'reminder-3',
+    name: 'Confirmação 4h antes',
+    triggerBefore: 240,
+    reminderType: 'dinamica',
+    channel: 'whatsapp',
+    templateId: '',
+    promptId: '',
+    isActive: true,
+  },
+  {
+    id: 'reminder-4',
+    name: 'Lembrete 30min antes',
+    triggerBefore: 30,
+    reminderType: 'dinamica',
+    channel: 'whatsapp',
+    templateId: '',
+    promptId: '',
     isActive: true,
   },
 ];
