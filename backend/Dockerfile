@@ -18,4 +18,4 @@ RUN npx prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "echo '=== Running migrations ===' && npx prisma migrate deploy 2>&1 && echo '=== Starting server ===' && ./node_modules/.bin/tsx src/server.ts 2>&1"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/server.ts"]
