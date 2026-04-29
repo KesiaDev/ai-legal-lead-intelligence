@@ -5,18 +5,17 @@ WORKDIR /app
 # OpenSSL required by Prisma on Debian/slim
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Copy backend package files (build context = project root)
-COPY backend/package*.json ./
-COPY backend/prisma ./prisma/
+# Build context = backend/ directory
+COPY package*.json ./
+COPY prisma ./prisma/
 
 RUN npm ci
 
-# Copy backend source
-COPY backend/ .
+COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx tsx src/server.ts"]
+CMD ["sh", "-c", "echo '=== Running migrations ===' && npx prisma migrate deploy 2>&1 && echo '=== Starting server ===' && ./node_modules/.bin/tsx src/server.ts 2>&1"]
