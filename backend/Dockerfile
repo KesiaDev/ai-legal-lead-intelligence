@@ -1,6 +1,9 @@
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
+
+# OpenSSL required by Prisma on Debian/slim
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first (cached layer)
 COPY package*.json ./
