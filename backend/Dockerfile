@@ -5,13 +5,13 @@ WORKDIR /app
 # OpenSSL required by Prisma on Debian/slim
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Build context = repo root (Railway default)
-COPY backend/package*.json ./
-COPY backend/prisma ./prisma/
+# Build context = backend/ (set Root Directory to "backend" in Railway service settings)
+COPY package*.json ./
+COPY prisma ./prisma/
 
 RUN npm ci
 
-COPY backend/ .
+COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
