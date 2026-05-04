@@ -225,8 +225,8 @@ async function build() {
       }
 
       if (!user.isActive) {
-        return reply.status(403).send({ 
-          error: 'Usuário desativado' 
+        return reply.status(403).send({
+          error: 'Conta aguardando aprovação. Entre em contato com o administrador.'
         });
       }
 
@@ -283,6 +283,7 @@ async function build() {
         password: hashed,
         role: 'admin',
         tenantId: tenant.id,
+        isActive: false,
       },
     });
 

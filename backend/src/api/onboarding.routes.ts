@@ -115,6 +115,7 @@ export async function registerOnboardingRoutes(fastify: FastifyInstance) {
           email,
           password: hashedPassword,
           role: 'admin',
+          isActive: false,
         },
       });
 
