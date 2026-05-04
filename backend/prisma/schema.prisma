@@ -34,6 +34,7 @@ model Tenant {
   departments     Department[]
   userIntegrations UserIntegration[]
   mediaFiles      MediaFile[]
+  subscription    Subscription?
 
   @@index([plan])
 }
@@ -593,4 +594,44 @@ model MediaFile {
 
   @@index([tenantId])
   @@index([type])
+}
+
+////////////////////
+// SUBSCRIPTION   //
+////////////////////
+
+model Subscription {
+  id        String @id @default(uuid())
+  tenantId  String @unique
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  plan      String @default("essencial") // essencial | escritorio | corporativo
+
+  // Status: trial | active | overdue | suspended | cancelled
+  status    String @default("trial")
+
+  // Asaas
+  asaasCustomerId    String?
+  asaasSubscriptionId String?
+  asaasPaymentLink   String?
+
+  // Ciclo de cobrança atual
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime
+
+  // Uso de leads no período atual (billing por lead)
+  leadsUsedThisPeriod Int @default(0)
+  leadsIncluded       Int @default(1000)
+  pricePerLead        Float @default(1.99)
+  monthlyPrice        Float @default(1990)
+
+  // Setup fee pago?
+  setupFeePaid Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([asaasCustomerId])
 }
