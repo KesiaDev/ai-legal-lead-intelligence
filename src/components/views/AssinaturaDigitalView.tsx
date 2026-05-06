@@ -1,278 +1,253 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import {
-  FileSignature, ExternalLink, Settings, RefreshCw,
-  LayoutDashboard, FileText, FolderOpen, LayoutTemplate,
-  Plus, Eye, Link, CheckCircle2, AlertCircle, Loader2,
-  ArrowRight, ShieldCheck, Clock, Users,
+  FileSignature, ExternalLink, Settings, ShieldCheck,
+  FolderOpen, LayoutTemplate, Clock, Star, CheckCircle2,
+  ChevronRight, LayoutDashboard, FileText, AlertCircle,
+  Plus, Users,
 } from 'lucide-react';
 
 const STORAGE_KEY = 'assinacomia_url';
+const DEFAULT_URL  = 'https://assinacomia.lovable.app';
 
 const TABS = [
-  { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { id: 'documents', label: 'Documentos', path: '/documents', icon: FileText },
-  { id: 'envelopes', label: 'Envelopes', path: '/envelopes', icon: FolderOpen },
-  { id: 'templates', label: 'Templates', path: '/templates', icon: LayoutTemplate },
-];
-
-const QUICK_ACTIONS = [
-  { label: 'Novo envelope', path: '/envelopes/new', icon: Plus, color: 'bg-amber-500 hover:bg-amber-600 text-black' },
-  { label: 'Ver documentos', path: '/documents', icon: Eye, color: 'bg-blue-600 hover:bg-blue-700 text-white' },
-  { label: 'Novo template', path: '/templates', icon: LayoutTemplate, color: 'bg-violet-600 hover:bg-violet-700 text-white' },
+  { id: 'dashboard',  label: 'Dashboard',   path: '/dashboard',         icon: LayoutDashboard },
+  { id: 'envelopes',  label: 'Envelopes',   path: '/envelopes',         icon: FolderOpen },
+  { id: 'new',        label: 'Novo envelope',path: '/envelopes/new',    icon: Plus },
+  { id: 'documents',  label: 'Documentos',  path: '/documents',         icon: FileText },
+  { id: 'templates',  label: 'Templates',   path: '/templates',         icon: LayoutTemplate },
 ];
 
 export function AssinaturaDigitalView() {
   const { toast } = useToast();
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [savedUrl, setSavedUrl] = useState(() => localStorage.getItem(STORAGE_KEY) || '');
-  const [editingUrl, setEditingUrl] = useState(savedUrl);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [iframeStatus, setIframeStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
-  const [showConfig, setShowConfig] = useState(!savedUrl);
+  const [mode, setMode] = useState<'portal' | 'app' | 'config'>('portal');
+  const [moduleUrl, setModuleUrl] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) { localStorage.setItem(STORAGE_KEY, DEFAULT_URL); }
+    return stored || DEFAULT_URL;
+  });
+  const [urlInput, setUrlInput] = useState(moduleUrl);
 
-  useEffect(() => {
-    if (savedUrl) setIframeStatus('loading');
-  }, [savedUrl, activeTab]);
+  const openExternal = (path?: string) =>
+    window.open(`${moduleUrl.replace(/\/$/, '')}${path ?? (TABS.find(t => t.id === activeTab)?.path ?? '/dashboard')}`, '_blank');
 
-  const currentPath = TABS.find(t => t.id === activeTab)?.path ?? '/dashboard';
-  const iframeSrc = savedUrl ? `${savedUrl.replace(/\/$/, '')}${currentPath}` : '';
-
-  const handleSaveUrl = () => {
-    let url = editingUrl.trim();
+  const handleSave = () => {
+    let url = urlInput.trim();
     if (!url) return;
     if (!url.startsWith('http')) url = 'https://' + url;
     localStorage.setItem(STORAGE_KEY, url);
-    setSavedUrl(url);
-    setShowConfig(false);
-    setIframeStatus('loading');
-    toast({ title: 'URL salva!', description: 'Conectando ao Assina com IA...' });
+    setModuleUrl(url);
+    setMode('portal');
+    toast({ title: 'URL salva!', description: url });
   };
 
-  const handleQuickAction = (path: string) => {
-    if (!savedUrl) { setShowConfig(true); return; }
-    const url = `${savedUrl.replace(/\/$/, '')}${path}`;
-    window.open(url, '_blank');
-  };
-
-  const handleOpenExternal = () => {
-    if (!savedUrl) return;
-    window.open(`${savedUrl.replace(/\/$/, '')}${currentPath}`, '_blank');
-  };
-
-  const handleRefresh = () => {
-    if (iframeRef.current) {
-      setIframeStatus('loading');
-      iframeRef.current.src = iframeSrc;
-    }
-  };
-
-  if (showConfig) {
+  if (mode === 'config') {
     return (
-      <div className="space-y-6 max-w-2xl mx-auto">
-        {/* Header */}
+      <div className="max-w-lg mx-auto space-y-6 pt-8">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
-            <FileSignature className="w-6 h-6 text-amber-500" />
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+            <FileSignature className="w-5 h-5 text-amber-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-display font-semibold">Assina com IA</h2>
-            <p className="text-sm text-muted-foreground">Plataforma de assinatura digital PAdES/ICP-Brasil</p>
+            <h3 className="font-semibold">Configurar URL — Assina com IA</h3>
+            <p className="text-xs text-muted-foreground">URL atual: {moduleUrl}</p>
           </div>
         </div>
-
-        {/* Feature highlights */}
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { icon: ShieldCheck, label: 'PAdES/ICP-Brasil', desc: 'Assinatura com validade jurídica' },
-            { icon: FolderOpen, label: 'Envelopes digitais', desc: 'Múltiplos signatários por documento' },
-            { icon: LayoutTemplate, label: 'Templates', desc: 'Contratos prontos para reutilizar' },
-            { icon: Clock, label: 'Auditoria completa', desc: 'Rastreabilidade de cada assinatura' },
-          ].map(f => (
-            <div key={f.label} className="border rounded-xl p-4 flex items-start gap-3">
-              <f.icon className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="font-medium text-sm">{f.label}</p>
-                <p className="text-xs text-muted-foreground">{f.desc}</p>
-              </div>
-            </div>
-          ))}
+        <div className="border rounded-xl p-5 space-y-4">
+          <div className="flex gap-2">
+            <Input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="https://assinacomia.lovable.app" onKeyDown={e => e.key === 'Enter' && handleSave()} />
+            <Button onClick={handleSave} disabled={!urlInput.trim()} className="bg-amber-500 hover:bg-amber-600 text-black flex-shrink-0">Salvar</Button>
+          </div>
         </div>
+        <Button variant="ghost" size="sm" onClick={() => setMode('portal')}>← Voltar</Button>
+      </div>
+    );
+  }
 
-        {/* URL config */}
-        <div className="border rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <Link className="w-5 h-5 text-amber-500" />
-            <h3 className="font-semibold">Conectar ao Assina com IA</h3>
+  if (mode === 'app') {
+    return (
+      <div className="flex flex-col gap-3 h-full">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <FileSignature className="w-5 h-5 text-amber-500" />
+            <span className="font-semibold text-sm">Assina com IA</span>
+            <Badge className="bg-amber-500 text-black text-[10px]">● Ativo</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Cole a URL onde o <strong>Assina com IA</strong> está publicado (ex: Cloudflare Pages ou Workers).
-          </p>
-          <div className="flex gap-2">
-            <Input
-              value={editingUrl}
-              onChange={e => setEditingUrl(e.target.value)}
-              placeholder="https://assinacomia.pages.dev"
-              onKeyDown={e => e.key === 'Enter' && handleSaveUrl()}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleSaveUrl}
-              disabled={!editingUrl.trim()}
-              className="bg-amber-500 hover:bg-amber-600 text-black gap-2 flex-shrink-0"
-            >
-              <ArrowRight className="w-4 h-4" />
-              Conectar
-            </Button>
-          </div>
-          <div className="flex items-start gap-2 bg-muted/50 rounded-lg p-3">
-            <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-muted-foreground">
-              O Assina com IA usa <strong>TanStack Start + Cloudflare Workers</strong>. Faça deploy com{' '}
-              <code className="bg-muted px-1 rounded">wrangler deploy</code> e cole a URL aqui.
-              O repositório é: <span className="text-amber-500">github.com/KesiaDev/assinacomia</span>
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => window.open('https://github.com/KesiaDev/assinacomia', '_blank')}
-            >
+          <div className="flex items-center gap-1 flex-wrap">
+            {TABS.map(t => (
+              <button
+                type="button"
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === t.id ? 'bg-amber-500 text-black' : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <t.icon className="w-3 h-3" />
+                {t.label}
+              </button>
+            ))}
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button type="button" size="sm" variant="ghost" onClick={() => openExternal()}>
               <ExternalLink className="w-3.5 h-3.5" />
-              Abrir repositório
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setMode('portal')}>
+              <Settings className="w-3.5 h-3.5" />
             </Button>
           </div>
+        </div>
+        <div className="flex-1 border rounded-xl overflow-hidden min-h-[550px] bg-muted/10">
+          <iframe
+            src={`${moduleUrl.replace(/\/$/, '')}${TABS.find(t => t.id === activeTab)?.path ?? '/dashboard'}`}
+            className="w-full h-full border-0"
+            title="Assina com IA"
+            allow="camera; microphone"
+            onError={() => openExternal()}
+          />
         </div>
       </div>
     );
   }
 
+  // Portal view
   return (
-    <div className="flex flex-col gap-4 h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center">
-            <FileSignature className="w-5 h-5 text-amber-500" />
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+            <FileSignature className="w-8 h-8 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-semibold">Assina com IA</h2>
-              <Badge
-                variant="outline"
-                className={`text-[10px] ${iframeStatus === 'loaded' ? 'border-green-500 text-green-600' : iframeStatus === 'error' ? 'border-red-500 text-red-500' : 'border-amber-500 text-amber-600'}`}
-              >
-                {iframeStatus === 'loaded' ? '● Conectado' : iframeStatus === 'error' ? '● Erro' : '● Conectando...'}
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-display font-bold">Assina com IA</h2>
+              <Badge className="bg-amber-500 text-black gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Módulo Ativo
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground truncate max-w-xs">{savedUrl}</p>
+            <p className="text-muted-foreground mt-0.5">
+              Assinatura digital com validade jurídica · PAdES/ICP-Brasil
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Quick actions */}
-          {QUICK_ACTIONS.map(a => (
-            <Button
-              key={a.label}
-              size="sm"
-              onClick={() => handleQuickAction(a.path)}
-              className={`gap-1.5 text-xs ${a.color}`}
-            >
-              <a.icon className="w-3.5 h-3.5" />
-              {a.label}
-            </Button>
-          ))}
-          <div className="w-px h-6 bg-border mx-1" />
-          <Button type="button" size="sm" variant="ghost" onClick={handleRefresh} title="Recarregar">
-            <RefreshCw className="w-4 h-4" />
+          <Button onClick={() => openExternal('/envelopes/new')} className="bg-amber-500 hover:bg-amber-600 text-black gap-2">
+            <Plus className="w-4 h-4" />
+            Novo envelope
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={handleOpenExternal} title="Abrir em nova aba">
-            <ExternalLink className="w-4 h-4" />
+          <Button onClick={() => setMode('app')} variant="outline" className="gap-2">
+            <LayoutDashboard className="w-4 h-4" />
+            Abrir módulo
           </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => { setShowConfig(true); setEditingUrl(savedUrl); }} title="Configurações">
+          <Button onClick={() => setMode('config')} variant="ghost" size="sm">
             <Settings className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border pb-0">
-        {TABS.map(tab => (
-          <button
-            type="button"
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              activeTab === tab.id
-                ? 'border-amber-500 text-amber-500'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-          </button>
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: 'Envelopes enviados', value: '—',  icon: FolderOpen,     color: 'text-amber-500' },
+          { label: 'Documentos assinados', value: '—', icon: FileSignature, color: 'text-emerald-500' },
+          { label: 'Templates criados', value: '—',   icon: LayoutTemplate, color: 'text-blue-500' },
+          { label: 'Signatários únicos', value: '—',  icon: Users,          color: 'text-violet-500' },
+        ].map(s => (
+          <div key={s.label} className="border rounded-xl p-4 flex items-center gap-3">
+            <s.icon className={`w-6 h-6 ${s.color}`} />
+            <div>
+              <p className="text-xl font-bold">{s.value}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+            </div>
+          </div>
         ))}
       </div>
 
-      {/* Iframe container */}
-      <div className="relative flex-1 border rounded-xl overflow-hidden bg-muted/20 min-h-[500px]">
-        {iframeStatus === 'loading' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-amber-500 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Carregando Assina com IA...</p>
-            </div>
-          </div>
-        )}
-        {iframeStatus === 'error' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-            <div className="text-center space-y-3">
-              <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
-              <p className="font-medium">Não foi possível carregar a plataforma</p>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                A plataforma pode bloquear exibição em iframe (X-Frame-Options). Tente abrir em nova aba.
-              </p>
-              <div className="flex gap-2 justify-center">
-                <Button size="sm" onClick={handleOpenExternal} className="gap-2 bg-amber-500 hover:bg-amber-600 text-black">
-                  <ExternalLink className="w-4 h-4" />
-                  Abrir em nova aba
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { setShowConfig(true); setEditingUrl(savedUrl); }}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Reconfigurar URL
-                </Button>
+      <div className="grid grid-cols-2 gap-6">
+        {/* Features */}
+        <div className="border rounded-xl p-5 space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Star className="w-4 h-4 text-amber-500" />
+            Funcionalidades
+          </h3>
+          <div className="space-y-3">
+            {[
+              { icon: ShieldCheck,    label: 'Validade jurídica PAdES/ICP-Brasil', desc: 'Padrão aceito em todo o território nacional' },
+              { icon: FolderOpen,     label: 'Envelopes com múltiplos signatários', desc: 'Ordem de assinatura configurável' },
+              { icon: LayoutTemplate, label: 'Templates reutilizáveis',             desc: 'Contratos e documentos prontos para usar' },
+              { icon: Clock,          label: 'Auditoria completa',                  desc: 'Log de cada ação e assinatura com timestamp' },
+              { icon: FileSignature,  label: 'Verificação de documentos',           desc: 'QR Code e hash para validação pública' },
+            ].map(f => (
+              <div key={f.label} className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <f.icon className="w-4 h-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{f.label}</p>
+                  <p className="text-xs text-muted-foreground">{f.desc}</p>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        )}
-        <iframe
-          ref={iframeRef}
-          src={iframeSrc}
-          className="w-full h-full border-0"
-          title="Assina com IA"
-          allow="camera; microphone"
-          onLoad={() => setIframeStatus('loaded')}
-          onError={() => setIframeStatus('error')}
-        />
+        </div>
+
+        {/* How it works */}
+        <div className="border rounded-xl p-5 space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <FileSignature className="w-4 h-4 text-amber-500" />
+            Como funciona
+          </h3>
+          <div className="space-y-3">
+            {[
+              { step: '1', label: 'Crie o envelope', desc: 'Faça upload do documento ou use um template' },
+              { step: '2', label: 'Adicione signatários', desc: 'Informe nome, e-mail e ordem de assinatura' },
+              { step: '3', label: 'Envie para assinar', desc: 'Os signatários recebem um link seguro por e-mail' },
+              { step: '4', label: 'Assinatura digital', desc: 'Cada parte assina com certificado ICP-Brasil' },
+              { step: '5', label: 'Documento finalizado', desc: 'PDF assinado e auditado disponível para download' },
+            ].map(f => (
+              <div key={f.step} className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-amber-500 text-black flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {f.step}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{f.label}</p>
+                  <p className="text-xs text-muted-foreground">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Footer hint */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-          <span>Documentos assinados aqui têm validade jurídica PAdES/ICP-Brasil</span>
+      {/* Quick actions */}
+      <div className="border rounded-xl p-5">
+        <h3 className="font-semibold mb-4">Ações rápidas</h3>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Novo envelope',        path: '/envelopes/new', icon: Plus,          color: 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20' },
+            { label: 'Ver envelopes',         path: '/envelopes',     icon: FolderOpen,    color: 'bg-orange-500/10 text-orange-600 hover:bg-orange-500/20' },
+            { label: 'Documentos assinados',  path: '/documents',     icon: FileText,      color: 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20' },
+            { label: 'Templates',             path: '/templates',     icon: LayoutTemplate,color: 'bg-violet-500/10 text-violet-600 hover:bg-violet-500/20' },
+            { label: 'Dashboard',             path: '/dashboard',     icon: LayoutDashboard,color: 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20' },
+            { label: 'Abrir completo',        path: '/dashboard',     icon: ExternalLink,  color: 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20' },
+          ].map(a => (
+            <button
+              type="button"
+              key={a.label}
+              onClick={() => openExternal(a.path)}
+              className={`flex items-center gap-3 p-3 rounded-xl transition-colors text-left ${a.color}`}
+            >
+              <a.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">{a.label}</span>
+              <ChevronRight className="w-3.5 h-3.5 ml-auto" />
+            </button>
+          ))}
         </div>
-        <button
-          type="button"
-          className="underline hover:text-foreground transition-colors"
-          onClick={handleOpenExternal}
-        >
-          Abrir em tela cheia →
-        </button>
       </div>
     </div>
   );
