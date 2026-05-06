@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Conversation } from './ChatLiveView';
 import { formatDistanceToNow } from 'date-fns';
@@ -14,21 +13,46 @@ interface ConversationsSidebarProps {
   onSelect: (conversation: Conversation) => void;
 }
 
+type AssignedFilter = 'all' | 'ai' | 'human' | 'hybrid';
+type StatusFilter = 'all' | 'active' | 'paused' | 'closed';
+
+const ASSIGNED_CHIPS: { value: AssignedFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'ai', label: 'IA' },
+  { value: 'human', label: 'Humano' },
+  { value: 'hybrid', label: 'Híbrido' },
+];
+
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'active', label: 'Ativo' },
+  { value: 'paused', label: 'Pausado' },
+  { value: 'closed', label: 'Fechado' },
+];
+
 export function ConversationsSidebar({
   conversations,
   selectedId,
   onSelect,
 }: ConversationsSidebarProps) {
   const [search, setSearch] = useState('');
+  const [assignedFilter, setAssignedFilter] = useState<AssignedFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   const filteredConversations = conversations.filter(conv => {
-    if (!search) return true;
-    const searchLower = search.toLowerCase();
-    return (
-      conv.lead.name.toLowerCase().includes(searchLower) ||
-      conv.lead.phone.includes(search) ||
-      conv.lead.email?.toLowerCase().includes(searchLower)
-    );
+    if (search) {
+      const searchLower = search.toLowerCase();
+      const matchesSearch =
+        conv.lead.name.toLowerCase().includes(searchLower) ||
+        conv.lead.phone.includes(search) ||
+        conv.lead.email?.toLowerCase().includes(searchLower);
+      if (!matchesSearch) return false;
+    }
+
+    if (assignedFilter !== 'all' && conv.assignedType !== assignedFilter) return false;
+    if (statusFilter !== 'all' && conv.status !== statusFilter) return false;
+
+    return true;
   });
 
   const formatTime = (dateString: string) => {
@@ -89,11 +113,43 @@ export function ConversationsSidebar({
           />
         </div>
 
-        {/* Filtros */}
-        <Button variant="outline" size="sm" className="w-full">
-          <Filter className="w-4 h-4 mr-2" />
-          Filtros
-        </Button>
+        {/* Filtros por tipo de agente */}
+        <div className="flex flex-wrap gap-1.5">
+          {ASSIGNED_CHIPS.map((chip) => (
+            <button
+              key={chip.value}
+              type="button"
+              onClick={() => setAssignedFilter(chip.value)}
+              className={cn(
+                'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                assignedFilter === chip.value
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filtros por status */}
+        <div className="flex flex-wrap gap-1.5">
+          {STATUS_CHIPS.map((chip) => (
+            <button
+              key={chip.value}
+              type="button"
+              onClick={() => setStatusFilter(chip.value)}
+              className={cn(
+                'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                statusFilter === chip.value
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Lista de conversas */}

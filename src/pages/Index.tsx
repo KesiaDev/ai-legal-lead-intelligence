@@ -15,6 +15,13 @@ import { ReportsView } from '@/components/views/ReportsView';
 import { DepartmentsView } from '@/components/views/DepartmentsView';
 import { IntegrationsView } from '@/components/views/IntegrationsView';
 import { SettingsView } from '@/components/settings/SettingsView';
+import { AgentsLibraryView } from '@/components/views/AgentsLibraryView';
+import { BulkMessagingView } from '@/components/views/BulkMessagingView';
+import { MultiWhatsAppView } from '@/components/views/MultiWhatsAppView';
+import { MultiAgentsView } from '@/components/views/MultiAgentsView';
+import { AssinaturaDigitalView } from '@/components/views/AssinaturaDigitalView';
+import { JurisAIView } from '@/components/views/JurisAIView';
+import { PeticionamentoView } from '@/components/views/PeticionamentoView';
 
 function AppContent() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -38,8 +45,15 @@ function AppContent() {
       case 'departments': return 'Departamentos';
       case 'integrations': return 'Integrações';
       case 'export': return 'Exportar Dados';
+      case 'agents-library': return 'Biblioteca de Agentes';
       case 'agent': return 'Configuração do Agente';
       case 'settings': return 'Configurações';
+      case 'bulk-messaging': return 'Envios em Massa';
+      case 'whatsapp-numbers': return 'Números WhatsApp';
+      case 'multi-agents': return 'Multi-Agentes';
+      case 'assinatura': return 'Assinatura Digital';
+      case 'juris-ai': return 'Juris AI — Jurisprudência';
+      case 'peticionamento': return 'Peticionamento com IA';
       default: return 'SDR Jurídico';
     }
   };
@@ -78,8 +92,15 @@ function AppContent() {
           {currentView === 'reports' && <ReportsView />}
           {currentView === 'departments' && <DepartmentsView />}
           {currentView === 'integrations' && <IntegrationsView />}
+          {currentView === 'agents-library' && <AgentsLibraryView />}
           {currentView === 'agent' && <AgentConfigView />}
           {currentView === 'settings' && <SettingsView />}
+          {currentView === 'bulk-messaging' && <BulkMessagingView />}
+          {currentView === 'whatsapp-numbers' && <MultiWhatsAppView />}
+          {currentView === 'multi-agents' && <MultiAgentsView />}
+          {currentView === 'assinatura' && <AssinaturaDigitalView />}
+          {currentView === 'juris-ai' && <JurisAIView />}
+          {currentView === 'peticionamento' && <PeticionamentoView />}
         </div>
       </main>
     </div>

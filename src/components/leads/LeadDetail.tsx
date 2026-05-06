@@ -1,15 +1,18 @@
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { 
-  X, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  MessageSquare, 
+import {
+  X,
+  Phone,
+  MapPin,
+  Calendar,
+  MessageSquare,
   Clock,
   Shield,
   User,
-  FileText
+  FileText,
+  FileSignature,
+  Scale,
+  FilePen,
 } from 'lucide-react';
 import { Lead, LEGAL_AREAS, URGENCY_LABELS, STATUS_LABELS } from '@/types/lead';
 import { LeadStatusBadge } from './LeadStatusBadge';
@@ -209,6 +212,87 @@ export function LeadDetail({ lead, onClose }: LeadDetailProps) {
             <p>
               Última atualização: {format(lead.updatedAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </p>
+          </div>
+
+          {/* Pesquisar jurisprudência */}
+          {lead.legalArea && (
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full gap-2 border-blue-500/40 text-blue-600 hover:bg-blue-500/10"
+                onClick={() => {
+                  const base = localStorage.getItem('jurisai_url');
+                  const area = lead.legalArea || '';
+                  const url = base
+                    ? `${base.replace(/\/$/, '')}/?page=search&area=${encodeURIComponent(area)}`
+                    : '#';
+                  if (!base) {
+                    alert('Configure a URL do Juris AI primeiro em: Juris AI → Configurações');
+                    return;
+                  }
+                  window.open(url, '_blank');
+                }}
+              >
+                <Scale className="w-4 h-4" />
+                Pesquisar jurisprudência · {lead.legalArea}
+              </Button>
+            </div>
+          )}
+
+          {/* Gerar petição */}
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10"
+              onClick={() => {
+                const base = localStorage.getItem('peticionamento_url');
+                const params = new URLSearchParams({
+                  client: lead.name,
+                  phone: lead.phone || '',
+                  area: lead.legalArea || '',
+                });
+                const url = base
+                  ? `${base.replace(/\/$/, '')}/ai/documents/new?${params}`
+                  : '#';
+                if (!base) {
+                  alert('Configure a URL do Peticionamento com IA primeiro em: Peticionamento IA → Configurações');
+                  return;
+                }
+                window.open(url, '_blank');
+              }}
+            >
+              <FilePen className="w-4 h-4" />
+              Gerar petição para este lead
+            </Button>
+          </div>
+
+          {/* Assinar documento */}
+          <div className="pt-2">
+            <Button
+              type="button"
+              className="w-full gap-2 bg-amber-500 hover:bg-amber-600 text-black"
+              onClick={() => {
+                const base = localStorage.getItem('assinacomia_url');
+                const params = new URLSearchParams({
+                  name: lead.name,
+                  phone: lead.phone || '',
+                  area: lead.legalArea || '',
+                });
+                const url = base
+                  ? `${base.replace(/\/$/, '')}/envelopes/new?${params}`
+                  : '#';
+                if (!base) {
+                  alert('Configure a URL do Assina com IA primeiro em: Assinatura Digital → Configurações');
+                  return;
+                }
+                window.open(url, '_blank');
+              }}
+            >
+              <FileSignature className="w-4 h-4" />
+              Enviar documento para assinar
+            </Button>
           </div>
         </div>
       </ScrollArea>
